@@ -265,14 +265,14 @@
   </header>
 
   <div class="total-bar">
-    <span class="total-label">Elapsed since punch</span>
+    <span class="total-label">Time since punch</span>
     <span class="total-value" id="totalElapsed">00:00:00</span>
   </div>
 
   <button class="punch-btn" id="punchBtn">Log Punch</button>
 
   <div class="note-row" id="noteRow">
-    <input type="text" id="noteInput" placeholder="What's happening? (optional)" autocomplete="off">
+    <input type="text" id="noteInput" placeholder="What's happening?" autocomplete="off">
     <button id="noteSaveBtn">Save</button>
   </div>
 
@@ -298,6 +298,15 @@
 
 <script>
   const STORAGE_KEY = 'fieldLog.entries.v1';
+
+  const NOTE_PROMPTS = [
+    "What's happening?",
+    "What's up?",
+    "What's going on?",
+    "Where you at?",
+    "What now?",
+    "What's next?"
+  ];
 
   let entries = [];
   let totalTimer = null;
@@ -436,6 +445,7 @@
     saveEntries();
     render();
     noteInput.value = '';
+    noteInput.placeholder = NOTE_PROMPTS[Math.floor(Math.random() * NOTE_PROMPTS.length)];
     noteRow.classList.add('active');
     noteInput.focus();
     if (navigator.vibrate) navigator.vibrate(30);
