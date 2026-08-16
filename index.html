@@ -385,7 +385,7 @@
       totalElapsedEl.textContent = '00:00:00';
       return;
     }
-    const start = entries[0].time;
+    const start = entries[entries.length - 1].time;
     const now = new Date();
     totalElapsedEl.textContent = fmtDuration(now - start);
   }
@@ -467,7 +467,10 @@
 
   function buildLogText() {
     let text = `Field Log — ${dateDisplay.textContent}\n`;
-    text += `Total elapsed: ${totalElapsedEl.textContent}\n\n`;
+    if (entries.length > 0) {
+      const dayTotal = new Date() - entries[0].time;
+      text += `Total elapsed: ${fmtDuration(dayTotal)}\n\n`;
+    }
     entries.forEach((entry, idx) => {
       const gap = idx > 0 ? '  (' + fmtGap(entry.time - entries[idx - 1].time) + ')' : '';
       text += `${fmtTime(entry.time)}${gap} — ${entry.note || '(no note)'}\n`;
