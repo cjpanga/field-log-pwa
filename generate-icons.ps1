@@ -1,0 +1,54 @@
+Add-Type -AssemblyName System.Drawing
+
+$root = $PSScriptRoot
+$iconsDir = Join-Path $root "icons"
+if (-not (Test-Path $iconsDir)) { New-Item -ItemType Directory -Path $iconsDir | Out-Null }
+
+$accent = [System.Drawing.Color]::FromArgb(255, 0xFF, 0x6B, 0x1A)
+$dark   = [System.Drawing.Color]::FromArgb(255, 0x14, 0x18, 0x1C)
+$light  = [System.Drawing.Color]::FromArgb(255, 0xE8, 0xEB, 0xEE)
+
+function New-Icon($size, $path) {
+  $bmp = New-Object System.Drawing.Bitmap($size, $size)
+  $g = [System.Drawing.Graphics]::FromImage($bmp)
+  $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+  $g.Clear($accent)
+
+  # clock face circle, sized to stay within a maskable-safe zone (~62% of canvas)
+  $faceD = [int]($size * 0.62)
+  $faceX = [int](($size - $faceD) / 2)
+  $faceY = $faceX
+  $faceBrush = New-Object System.Drawing.SolidBrush($dark)
+  $g.FillEllipse($faceBrush, $faceX, $faceY, $faceD, $faceD)
+
+  $cx = $size / 2
+  $cy = $size / 2
+  $penWidth = [Math]::Max(2, [int]($size * 0.045))
+  $pen = New-Object System.Drawing.Pen($light, $penWidth)
+  $pen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+  $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+
+  # minute hand (up)
+  $g.DrawLine($pen, $cx, $cy, $cx, $cy - $size * 0.22)
+  # hour hand (right-down)
+  $g.DrawLine($pen, $cx, $cy, $cx + $size * 0.15, $cy + $size * 0.06)
+
+  # center dot
+  $dotR = [Math]::Max(2, [int]($size * 0.035))
+  $dotBrush = New-Object System.Drawing.SolidBrush($light)
+  $g.FillEllipse($dotBrush, $cx - $dotR, $cy - $dotR, $dotR * 2, $dotR * 2)
+
+  $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
+
+  $g.Dispose()
+  $bmp.Dispose()
+  $faceBrush.Dispose()
+  $dotBrush.Dispose()
+  $pen.Dispose()
+}
+
+New-Icon 180 (Join-Path $iconsDir "icon-180.png")
+New-Icon 192 (Join-Path $iconsDir "icon-192.png")
+New-Icon 512 (Join-Path $iconsDir "icon-512.png")
+
+Write-Host "Icons written to $iconsDir"

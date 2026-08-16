@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>Field Log</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14181c">
+
+<!-- iOS home screen support -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Field Log">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+
+<style>
+  :root {
+    --bg: #14181c;
+    --panel: #1c2127;
+    --panel-raised: #232a31;
+    --line: #333c44;
+    --text: #e8ebee;
+    --text-dim: #8b95a1;
+    --accent: #ff6b1a;
+    --accent-dim: #7a3a13;
+    --mono: 'SF Mono', 'JetBrains Mono', Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 16px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .wrap { max-width: 480px; margin: 0 auto; }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+  }
+
+  h1 {
+    font-size: 15px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+
+  .date {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .total-bar {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 14px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .total-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+  .total-value { font-family: var(--mono); font-size: 22px; font-weight: 600; color: var(--accent); }
+
+  .punch-btn {
+    width: 100%;
+    padding: 26px;
+    background: var(--accent);
+    color: #14181c;
+    border: none;
+    border-radius: 14px;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    margin-top: 4px;
+    transition: transform 0.08s ease, background 0.15s ease;
+  }
+  .punch-btn:active { transform: scale(0.97); background: #ff7f3d; }
+
+  .note-row {
+    display: none;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .note-row.active { display: flex; }
+
+  .note-row input {
+    flex: 1;
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 15px;
+    font-family: var(--sans);
+  }
+  .note-row input:focus { outline: none; border-color: var(--accent); }
+
+  .note-row button {
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    color: var(--accent);
+    border-radius: 8px;
+    padding: 0 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .log {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .entry {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .entry-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+  .entry-time { font-family: var(--mono); font-size: 13px; color: var(--text-dim); }
+  .entry-note {
+    font-size: 14.5px;
+    color: var(--text);
+    background: transparent;
+    border: none;
+    padding: 0;
+    width: 100%;
+  }
+  .entry-note:focus { outline: none; }
+  .entry-note::placeholder { color: var(--text-dim); font-style: italic; }
+
+  .entry-gap {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    white-space: nowrap;
+    text-align: right;
+  }
+
+  .del-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+  }
+  .del-btn:active { color: var(--accent); }
+
+  .empty {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    padding: 30px 10px;
+    border: 1px dashed var(--line);
+    border-radius: 10px;
+    margin-top: 20px;
+  }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 18px;
+  }
+
+  .actions button {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .actions button.primary {
+    border-color: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .actions button:active { background: var(--panel-raised); }
+
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: var(--panel-raised);
+    border: 1px solid var(--accent-dim);
+    color: var(--text);
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    max-width: 90vw;
+    text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .warn-note {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-align: center;
+    margin-top: 16px;
+    line-height: 1.5;
+  }
+
+  .export-box {
+    display: none;
+    margin-top: 12px;
+  }
+  .export-box.active { display: block; }
+  .export-box textarea {
+    width: 100%;
+    min-height: 160px;
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.5;
+    resize: vertical;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Field Log</h1>
+    <div class="date" id="dateDisplay"></div>
+  </header>
+
+  <div class="total-bar">
+    <span class="total-label">Elapsed since punch</span>
+    <span class="total-value" id="totalElapsed">00:00:00</span>
+  </div>
+
+  <button class="punch-btn" id="punchBtn">Log Punch</button>
+
+  <div class="note-row" id="noteRow">
+    <input type="text" id="noteInput" placeholder="What's happening? (optional)" autocomplete="off">
+    <button id="noteSaveBtn">Save</button>
+  </div>
+
+  <div id="logContainer">
+    <div class="empty" id="emptyState">No punches yet. Tap "Log Punch" when you leave the office, arrive on site, wrap up — whatever you want timestamped.</div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <div class="actions">
+    <button id="copyBtn" class="primary">Copy Log</button>
+    <button id="exportBtn">Export Text</button>
+    <button id="resetBtn">Reset Day</button>
+  </div>
+
+  <div class="export-box" id="exportBox">
+    <textarea id="exportText" readonly></textarea>
+  </div>
+
+  <div class="warn-note" id="warnNote">Saved on this device automatically. Works fully offline.</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const STORAGE_KEY = 'fieldLog.entries.v1';
+
+  let entries = [];
+  let totalTimer = null;
+
+  const punchBtn = document.getElementById('punchBtn');
+  const noteRow = document.getElementById('noteRow');
+  const noteInput = document.getElementById('noteInput');
+  const noteSaveBtn = document.getElementById('noteSaveBtn');
+  const logEl = document.getElementById('log');
+  const emptyState = document.getElementById('emptyState');
+  const totalElapsedEl = document.getElementById('totalElapsed');
+  const copyBtn = document.getElementById('copyBtn');
+  const exportBtn = document.getElementById('exportBtn');
+  const exportBox = document.getElementById('exportBox');
+  const exportText = document.getElementById('exportText');
+  const resetBtn = document.getElementById('resetBtn');
+  const toast = document.getElementById('toast');
+  const dateDisplay = document.getElementById('dateDisplay');
+
+  dateDisplay.textContent = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+
+  function fmtTime(d) {
+    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  }
+
+  function fmtDuration(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+  }
+
+  function fmtGap(ms) {
+    const totalMin = Math.round(ms / 60000);
+    if (totalMin < 1) return '<1m';
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return h > 0 ? `+${h}h ${m}m` : `+${m}m`;
+  }
+
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1800);
+  }
+
+  // --- persistence ---
+
+  function saveEntries() {
+    try {
+      const serializable = entries.map(e => ({ time: e.time.toISOString(), note: e.note }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializable));
+    } catch (err) {
+      showToast('Save failed — storage may be full');
+    }
+  }
+
+  function loadEntries() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return parsed
+        .map(e => ({ time: new Date(e.time), note: e.note || '' }))
+        .filter(e => !isNaN(e.time.getTime()));
+    } catch (err) {
+      return [];
+    }
+  }
+
+  // --- rendering ---
+
+  function updateTotal() {
+    if (entries.length === 0) {
+      totalElapsedEl.textContent = '00:00:00';
+      return;
+    }
+    const start = entries[0].time;
+    const now = new Date();
+    totalElapsedEl.textContent = fmtDuration(now - start);
+  }
+
+  function render() {
+    if (entries.length === 0) {
+      emptyState.style.display = 'block';
+      logEl.innerHTML = '';
+      updateTotal();
+      return;
+    }
+    emptyState.style.display = 'none';
+    logEl.innerHTML = '';
+
+    entries.forEach((entry, idx) => {
+      const div = document.createElement('div');
+      div.className = 'entry';
+
+      const gap = idx > 0 ? fmtGap(entry.time - entries[idx - 1].time) : '';
+
+      div.innerHTML = `
+        <div class="entry-left">
+          <span class="entry-time">${fmtTime(entry.time)}</span>
+          <input class="entry-note" type="text" placeholder="add note" value="${entry.note.replace(/"/g, '&quot;')}" data-idx="${idx}">
+        </div>
+        <span class="entry-gap">${gap}</span>
+        <button class="del-btn" data-idx="${idx}">&times;</button>
+      `;
+      logEl.appendChild(div);
+    });
+
+    // wire up note edits
+    logEl.querySelectorAll('.entry-note').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const idx = parseInt(e.target.dataset.idx);
+        entries[idx].note = e.target.value;
+        saveEntries();
+      });
+    });
+
+    // wire up deletes
+    logEl.querySelectorAll('.del-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const idx = parseInt(e.target.dataset.idx);
+        entries.splice(idx, 1);
+        saveEntries();
+        render();
+      });
+    });
+
+    updateTotal();
+  }
+
+  punchBtn.addEventListener('click', () => {
+    const timestamp = new Date();
+    entries.push({ time: timestamp, note: '' });
+    saveEntries();
+    render();
+    noteInput.value = '';
+    noteRow.classList.add('active');
+    noteInput.focus();
+    if (navigator.vibrate) navigator.vibrate(30);
+  });
+
+  function saveNote() {
+    if (entries.length > 0) {
+      entries[entries.length - 1].note = noteInput.value.trim();
+      saveEntries();
+      render();
+    }
+    noteRow.classList.remove('active');
+  }
+
+  noteSaveBtn.addEventListener('click', saveNote);
+  noteInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveNote();
+  });
+
+  function buildLogText() {
+    let text = `Field Log — ${dateDisplay.textContent}\n`;
+    text += `Total elapsed: ${totalElapsedEl.textContent}\n\n`;
+    entries.forEach((entry, idx) => {
+      const gap = idx > 0 ? '  (' + fmtGap(entry.time - entries[idx - 1].time) + ')' : '';
+      text += `${fmtTime(entry.time)}${gap} — ${entry.note || '(no note)'}\n`;
+    });
+    return text;
+  }
+
+  copyBtn.addEventListener('click', () => {
+    if (entries.length === 0) {
+      showToast('Nothing to copy yet');
+      return;
+    }
+    const text = buildLogText();
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('Copied to clipboard');
+      }).catch(() => {
+        fallbackShowExport(text);
+      });
+    } else {
+      fallbackShowExport(text);
+    }
+  });
+
+  function fallbackShowExport(text) {
+    exportText.value = text;
+    exportBox.classList.add('active');
+    exportText.focus();
+    exportText.select();
+    showToast('Copy failed — text selected below');
+  }
+
+  exportBtn.addEventListener('click', () => {
+    if (entries.length === 0) {
+      showToast('Nothing to export yet');
+      return;
+    }
+    exportText.value = buildLogText();
+    exportBox.classList.toggle('active');
+    if (exportBox.classList.contains('active')) {
+      exportText.focus();
+      exportText.select();
+    }
+  });
+
+  resetBtn.addEventListener('click', () => {
+    if (entries.length > 0 && !confirm('Clear today\'s log? Make sure you copied it out first.')) return;
+    entries = [];
+    saveEntries();
+    exportBox.classList.remove('active');
+    render();
+    showToast('Log cleared');
+  });
+
+  // --- init ---
+  entries = loadEntries();
+  render();
+  totalTimer = setInterval(updateTotal, 1000);
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {
+        // offline support just won't be available this session
+      });
+    });
+  }
+</script>
+</body>
+</html>
