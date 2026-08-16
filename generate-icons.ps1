@@ -8,23 +8,23 @@ $accent = [System.Drawing.Color]::FromArgb(255, 0xFF, 0x6B, 0x1A)
 $dark   = [System.Drawing.Color]::FromArgb(255, 0x14, 0x18, 0x1C)
 $light  = [System.Drawing.Color]::FromArgb(255, 0xE8, 0xEB, 0xEE)
 
-function New-Icon($size, $path) {
+function New-Icon($size, $path, $bgColor, $faceColor, $handColor) {
   $bmp = New-Object System.Drawing.Bitmap($size, $size)
   $g = [System.Drawing.Graphics]::FromImage($bmp)
   $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-  $g.Clear($accent)
+  $g.Clear($bgColor)
 
   # clock face circle, sized to stay within a maskable-safe zone (~62% of canvas)
   $faceD = [int]($size * 0.62)
   $faceX = [int](($size - $faceD) / 2)
   $faceY = $faceX
-  $faceBrush = New-Object System.Drawing.SolidBrush($dark)
+  $faceBrush = New-Object System.Drawing.SolidBrush($faceColor)
   $g.FillEllipse($faceBrush, $faceX, $faceY, $faceD, $faceD)
 
   $cx = $size / 2
   $cy = $size / 2
   $penWidth = [Math]::Max(2, [int]($size * 0.045))
-  $pen = New-Object System.Drawing.Pen($light, $penWidth)
+  $pen = New-Object System.Drawing.Pen($handColor, $penWidth)
   $pen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
   $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
 
@@ -35,7 +35,7 @@ function New-Icon($size, $path) {
 
   # center dot
   $dotR = [Math]::Max(2, [int]($size * 0.035))
-  $dotBrush = New-Object System.Drawing.SolidBrush($light)
+  $dotBrush = New-Object System.Drawing.SolidBrush($handColor)
   $g.FillEllipse($dotBrush, $cx - $dotR, $cy - $dotR, $dotR * 2, $dotR * 2)
 
   $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
@@ -47,8 +47,15 @@ function New-Icon($size, $path) {
   $pen.Dispose()
 }
 
-New-Icon 180 (Join-Path $iconsDir "icon-180.png")
-New-Icon 192 (Join-Path $iconsDir "icon-192.png")
-New-Icon 512 (Join-Path $iconsDir "icon-512.png")
+# light/default variant: orange background, dark face, light hands
+New-Icon 180 (Join-Path $iconsDir "icon-180.png") $accent $dark $light
+New-Icon 192 (Join-Path $iconsDir "icon-192.png") $accent $dark $light
+New-Icon 512 (Join-Path $iconsDir "icon-512.png") $accent $dark $light
+
+# dark-appearance variant: dark background, orange face, light hands
+# (used via <link rel="apple-touch-icon" media="(prefers-color-scheme: dark)">
+# so iOS 18's Dark home-screen icon mode shows our real colors instead of
+# auto-desaturating the light icon)
+New-Icon 180 (Join-Path $iconsDir "icon-180-dark.png") $dark $accent $light
 
 Write-Host "Icons written to $iconsDir"
