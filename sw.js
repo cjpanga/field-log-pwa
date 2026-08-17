@@ -1,15 +1,15 @@
 // Bump this whenever index.html/manifest/icons change, so installed
 // iOS home-screen apps pick up the update instead of serving stale cache.
-const CACHE_VERSION = 'field-log-v6';
+const CACHE_VERSION = 'field-log-v7';
 
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './icons/icon-180.png',
-  './icons/icon-180-dark.png',
-  './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icons/icon-180-v2.png',
+  './icons/icon-180-dark-v2.png',
+  './icons/icon-192-v2.png',
+  './icons/icon-512-v2.png'
 ];
 
 self.addEventListener('install', (event) => {

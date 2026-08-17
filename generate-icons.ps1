@@ -47,15 +47,18 @@ function New-Icon($size, $path, $bgColor, $faceColor, $handColor) {
   $pen.Dispose()
 }
 
+# Filenames are versioned (v2) to bust iOS Safari's touch-icon cache, which
+# keys off the URL and can keep serving a stale icon even after the web clip
+# is deleted and re-added from the home screen.
+
 # light/default variant: orange background, dark face, light hands
-New-Icon 180 (Join-Path $iconsDir "icon-180.png") $accent $dark $light
-New-Icon 192 (Join-Path $iconsDir "icon-192.png") $accent $dark $light
-New-Icon 512 (Join-Path $iconsDir "icon-512.png") $accent $dark $light
+New-Icon 180 (Join-Path $iconsDir "icon-180-v2.png") $accent $dark $light
+New-Icon 192 (Join-Path $iconsDir "icon-192-v2.png") $accent $dark $light
+New-Icon 512 (Join-Path $iconsDir "icon-512-v2.png") $accent $dark $light
 
 # dark-appearance variant: dark background, white face, orange hands
 # (used via <link rel="apple-touch-icon" media="(prefers-color-scheme: dark)">
-# so iOS 18's Dark home-screen icon mode shows our real colors instead of
-# auto-desaturating the light icon)
-New-Icon 180 (Join-Path $iconsDir "icon-180-dark.png") $dark $light $accent
+# in case iOS does honor per-appearance touch icons once the cache is busted)
+New-Icon 180 (Join-Path $iconsDir "icon-180-dark-v2.png") $dark $light $accent
 
 Write-Host "Icons written to $iconsDir"
