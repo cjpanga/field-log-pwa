@@ -52,10 +52,10 @@ New-Icon 180 (Join-Path $iconsDir "icon-180.png") $accent $dark $light
 New-Icon 192 (Join-Path $iconsDir "icon-192.png") $accent $dark $light
 New-Icon 512 (Join-Path $iconsDir "icon-512.png") $accent $dark $light
 
-# dark-appearance variant: dark background, orange face, light hands
+# dark-appearance variant: dark background, white face, orange hands
 # (used via <link rel="apple-touch-icon" media="(prefers-color-scheme: dark)">
 # so iOS 18's Dark home-screen icon mode shows our real colors instead of
 # auto-desaturating the light icon)
-New-Icon 180 (Join-Path $iconsDir "icon-180-dark.png") $dark $accent $light
+New-Icon 180 (Join-Path $iconsDir "icon-180-dark.png") $dark $light $accent
 
 Write-Host "Icons written to $iconsDir"
