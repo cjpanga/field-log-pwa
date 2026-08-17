@@ -92,17 +92,14 @@
     letter-spacing: 0.04em;
     text-transform: uppercase;
     cursor: pointer;
-    margin-top: 4px;
     transition: transform 0.08s ease, background 0.15s ease;
   }
   .punch-btn:active { transform: scale(0.97); background: #ff7f3d; }
 
   .note-row {
-    display: none;
-    gap: 8px;
-    margin-top: 10px;
+    display: flex;
+    margin-top: 14px;
   }
-  .note-row.active { display: flex; }
 
   .note-row input {
     flex: 1;
@@ -116,19 +113,8 @@
   }
   .note-row input:focus { outline: none; border-color: var(--accent); }
 
-  .note-row button {
-    background: var(--panel-raised);
-    border: 1px solid var(--line);
-    color: var(--accent);
-    border-radius: 8px;
-    padding: 0 18px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
   .log {
-    margin-top: 20px;
+    margin-top: 14px;
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -184,7 +170,7 @@
     padding: 30px 10px;
     border: 1px dashed var(--line);
     border-radius: 10px;
-    margin-top: 20px;
+    margin-top: 14px;
   }
 
   .actions {
@@ -275,7 +261,6 @@
 
   <div class="note-row" id="noteRow">
     <input type="text" id="noteInput" placeholder="What's happening?" autocomplete="off">
-    <button id="noteSaveBtn">Save</button>
   </div>
 
   <div id="logContainer">
@@ -314,9 +299,7 @@
   let totalTimer = null;
 
   const punchBtn = document.getElementById('punchBtn');
-  const noteRow = document.getElementById('noteRow');
   const noteInput = document.getElementById('noteInput');
-  const noteSaveBtn = document.getElementById('noteSaveBtn');
   const logEl = document.getElementById('log');
   const emptyState = document.getElementById('emptyState');
   const totalElapsedEl = document.getElementById('totalElapsed');
@@ -443,28 +426,13 @@
 
   punchBtn.addEventListener('click', () => {
     const timestamp = new Date();
-    entries.push({ time: timestamp, note: '' });
+    entries.push({ time: timestamp, note: noteInput.value.trim() });
     saveEntries();
     render();
     noteInput.value = '';
     noteInput.placeholder = NOTE_PROMPTS[Math.floor(Math.random() * NOTE_PROMPTS.length)];
-    noteRow.classList.add('active');
     noteInput.focus();
     if (navigator.vibrate) navigator.vibrate(30);
-  });
-
-  function saveNote() {
-    if (entries.length > 0) {
-      entries[entries.length - 1].note = noteInput.value.trim();
-      saveEntries();
-      render();
-    }
-    noteRow.classList.remove('active');
-  }
-
-  noteSaveBtn.addEventListener('click', saveNote);
-  noteInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') saveNote();
   });
 
   function buildLogText() {
@@ -530,6 +498,7 @@
 
   // --- init ---
   entries = loadEntries();
+  noteInput.placeholder = NOTE_PROMPTS[Math.floor(Math.random() * NOTE_PROMPTS.length)];
   render();
   totalTimer = setInterval(updateTotal, 1000);
 
