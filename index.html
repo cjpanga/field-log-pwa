@@ -198,6 +198,12 @@
 
   .actions button:active { background: var(--panel-raised); }
 
+  .actions button.confirm-pending {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #14181c;
+  }
+
   .toast {
     position: fixed;
     bottom: 20px;
@@ -424,7 +430,7 @@
     updateTotal();
   }
 
-  punchBtn.addEventListener('click', () => {
+  function logPunch() {
     const timestamp = new Date();
     entries.push({ time: timestamp, note: noteInput.value.trim() });
     saveEntries();
@@ -433,6 +439,12 @@
     noteInput.placeholder = NOTE_PROMPTS[Math.floor(Math.random() * NOTE_PROMPTS.length)];
     noteInput.focus();
     if (navigator.vibrate) navigator.vibrate(30);
+  }
+
+  punchBtn.addEventListener('click', logPunch);
+
+  noteInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') logPunch();
   });
 
   function buildLogText() {
@@ -487,8 +499,28 @@
     }
   });
 
+  const RESET_LABEL = resetBtn.textContent;
+  let resetConfirmTimer = null;
+
   resetBtn.addEventListener('click', () => {
-    if (entries.length > 0 && !confirm('Clear today\'s log? Make sure you copied it out first.')) return;
+    if (entries.length === 0) {
+      showToast('Nothing to clear');
+      return;
+    }
+
+    if (!resetBtn.classList.contains('confirm-pending')) {
+      resetBtn.classList.add('confirm-pending');
+      resetBtn.textContent = 'RESET?';
+      resetConfirmTimer = setTimeout(() => {
+        resetBtn.classList.remove('confirm-pending');
+        resetBtn.textContent = RESET_LABEL;
+      }, 3000);
+      return;
+    }
+
+    clearTimeout(resetConfirmTimer);
+    resetBtn.classList.remove('confirm-pending');
+    resetBtn.textContent = RESET_LABEL;
     entries = [];
     saveEntries();
     exportBox.classList.remove('active');
