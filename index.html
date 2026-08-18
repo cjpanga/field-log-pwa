@@ -95,8 +95,12 @@
     transition: transform 0.08s ease, background 0.15s ease, color 0.1s ease, outline-color 0.1s ease;
     outline: 2px solid transparent;
     outline-offset: -6px;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
   }
-  .punch-btn:active {
+  .punch-btn.pressed {
     transform: scale(0.97);
     background: transparent;
     color: var(--text);
@@ -459,6 +463,21 @@
   }
 
   punchBtn.addEventListener('click', logPunch);
+
+  // Drive the pressed visual directly from touch/mouse events instead of
+  // CSS :active — iOS Safari delays :active on touch by design (to
+  // disambiguate a tap from the start of a long-press/selection gesture),
+  // which made the button feel unresponsive and let the long-press trigger
+  // the native text-selection callout instead.
+  const press = () => punchBtn.classList.add('pressed');
+  const unpress = () => punchBtn.classList.remove('pressed');
+
+  punchBtn.addEventListener('touchstart', press, { passive: true });
+  punchBtn.addEventListener('touchend', unpress);
+  punchBtn.addEventListener('touchcancel', unpress);
+  punchBtn.addEventListener('mousedown', press);
+  punchBtn.addEventListener('mouseup', unpress);
+  punchBtn.addEventListener('mouseleave', unpress);
 
   noteInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') logPunch();
