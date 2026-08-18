@@ -92,9 +92,16 @@
     letter-spacing: 0.04em;
     text-transform: uppercase;
     cursor: pointer;
-    transition: transform 0.08s ease, background 0.15s ease;
+    transition: transform 0.08s ease, background 0.15s ease, color 0.1s ease, outline-color 0.1s ease;
+    outline: 2px solid transparent;
+    outline-offset: -6px;
   }
-  .punch-btn:active { transform: scale(0.97); background: #ff7f3d; }
+  .punch-btn:active {
+    transform: scale(0.97);
+    background: transparent;
+    color: var(--text);
+    outline-color: var(--accent);
+  }
 
   .note-row {
     display: flex;
@@ -276,7 +283,7 @@
   </div>
 
   <div id="logContainer">
-    <div class="empty" id="emptyState">No punches yet. Tap "Log Punch" when you leave the office, arrive on site, wrap up — whatever you want timestamped.</div>
+    <div class="empty" id="emptyState">No entries yet. Tap "Log Punch" when you leave the office, arrive on site, wrap up — whatever you want timestamped.</div>
     <div class="log" id="log"></div>
   </div>
 
@@ -443,7 +450,7 @@
     entries.push({ time: timestamp, note: noteInput.value.trim() });
     saveEntries();
     timerResetAt = null;
-    resetTimerBtnState();
+    resetTimerConfirm();
     render();
     noteInput.value = '';
     noteInput.placeholder = NOTE_PROMPTS[Math.floor(Math.random() * NOTE_PROMPTS.length)];
@@ -496,78 +503,77 @@
     showToast('Copy failed — text selected below');
   }
 
-  const RESET_TIMER_LABEL = resetTimerBtn.textContent;
-  let resetTimerConfirmTimer = null;
-  let resetTimerStage = 0;
+  // Generic multi-tap confirm: each entry in `stages` is shown in order as
+  // the button is tapped; the final tap (past the last stage) runs `onConfirm`.
+  // Auto-reverts to the original label after 3s of inactivity at any stage.
+  function makeConfirmButton(btn, stages, guard, guardFailMessage, onConfirm) {
+    const originalLabel = btn.textContent;
+    const allClasses = stages.map((s) => s.class);
+    let stage = 0;
+    let timer = null;
 
-  function resetTimerBtnState() {
-    clearTimeout(resetTimerConfirmTimer);
-    resetTimerStage = 0;
-    resetTimerBtn.classList.remove('confirm-pending', 'confirm-pending-final');
-    resetTimerBtn.textContent = RESET_TIMER_LABEL;
+    function reset() {
+      clearTimeout(timer);
+      stage = 0;
+      btn.classList.remove(...allClasses);
+      btn.textContent = originalLabel;
+    }
+
+    btn.addEventListener('click', () => {
+      if (!guard()) {
+        showToast(guardFailMessage);
+        return;
+      }
+
+      clearTimeout(timer);
+
+      if (stage < stages.length) {
+        const { text, class: cls } = stages[stage];
+        btn.classList.remove(...allClasses);
+        btn.classList.add(cls);
+        btn.textContent = text;
+        stage++;
+        timer = setTimeout(reset, 3000);
+        return;
+      }
+
+      reset();
+      onConfirm();
+    });
+
+    return reset;
   }
 
-  resetTimerBtn.addEventListener('click', () => {
-    if (entries.length === 0) {
-      showToast('Nothing to reset');
-      return;
+  const resetTimerConfirm = makeConfirmButton(
+    resetTimerBtn,
+    [{ text: 'RESET?', class: 'confirm-pending' }],
+    () => entries.length > 0,
+    'Nothing to reset',
+    () => {
+      timerResetAt = new Date();
+      updateTotal();
+      showToast('Timer reset');
     }
+  );
 
-    clearTimeout(resetTimerConfirmTimer);
-
-    if (resetTimerStage === 0) {
-      resetTimerStage = 1;
-      resetTimerBtn.classList.add('confirm-pending');
-      resetTimerBtn.textContent = 'RESET';
-      resetTimerConfirmTimer = setTimeout(resetTimerBtnState, 3000);
-      return;
+  const resetDayConfirm = makeConfirmButton(
+    resetBtn,
+    [
+      { text: 'RESET', class: 'confirm-pending' },
+      { text: 'ARE YOU SURE?', class: 'confirm-pending-final' }
+    ],
+    () => entries.length > 0,
+    'Nothing to clear',
+    () => {
+      entries = [];
+      timerResetAt = null;
+      resetTimerConfirm();
+      saveEntries();
+      exportBox.classList.remove('active');
+      render();
+      showToast('Log cleared');
     }
-
-    if (resetTimerStage === 1) {
-      resetTimerStage = 2;
-      resetTimerBtn.classList.remove('confirm-pending');
-      resetTimerBtn.classList.add('confirm-pending-final');
-      resetTimerBtn.textContent = 'ARE YOU SURE?';
-      resetTimerConfirmTimer = setTimeout(resetTimerBtnState, 3000);
-      return;
-    }
-
-    timerResetAt = new Date();
-    updateTotal();
-    resetTimerBtnState();
-    showToast('Timer reset');
-  });
-
-  const RESET_LABEL = resetBtn.textContent;
-  let resetConfirmTimer = null;
-
-  resetBtn.addEventListener('click', () => {
-    if (entries.length === 0) {
-      showToast('Nothing to clear');
-      return;
-    }
-
-    if (!resetBtn.classList.contains('confirm-pending')) {
-      resetBtn.classList.add('confirm-pending');
-      resetBtn.textContent = 'RESET?';
-      resetConfirmTimer = setTimeout(() => {
-        resetBtn.classList.remove('confirm-pending');
-        resetBtn.textContent = RESET_LABEL;
-      }, 3000);
-      return;
-    }
-
-    clearTimeout(resetConfirmTimer);
-    resetBtn.classList.remove('confirm-pending');
-    resetBtn.textContent = RESET_LABEL;
-    entries = [];
-    timerResetAt = null;
-    resetTimerBtnState();
-    saveEntries();
-    exportBox.classList.remove('active');
-    render();
-    showToast('Log cleared');
-  });
+  );
 
   // --- init ---
   entries = loadEntries();
