@@ -204,6 +204,12 @@
     color: #14181c;
   }
 
+  .actions button.confirm-pending-final {
+    background: #ffb347;
+    border-color: #ffb347;
+    color: #14181c;
+  }
+
   .toast {
     position: fixed;
     bottom: 20px;
@@ -276,7 +282,7 @@
 
   <div class="actions">
     <button id="copyBtn" class="primary">Copy Log</button>
-    <button id="exportBtn">Export Text</button>
+    <button id="resetTimerBtn">Reset Timer</button>
     <button id="resetBtn">Reset Day</button>
   </div>
 
@@ -303,6 +309,7 @@
 
   let entries = [];
   let totalTimer = null;
+  let timerResetAt = null;
 
   const punchBtn = document.getElementById('punchBtn');
   const noteInput = document.getElementById('noteInput');
@@ -310,9 +317,9 @@
   const emptyState = document.getElementById('emptyState');
   const totalElapsedEl = document.getElementById('totalElapsed');
   const copyBtn = document.getElementById('copyBtn');
-  const exportBtn = document.getElementById('exportBtn');
   const exportBox = document.getElementById('exportBox');
   const exportText = document.getElementById('exportText');
+  const resetTimerBtn = document.getElementById('resetTimerBtn');
   const resetBtn = document.getElementById('resetBtn');
   const toast = document.getElementById('toast');
   const dateDisplay = document.getElementById('dateDisplay');
@@ -376,7 +383,8 @@
       totalElapsedEl.textContent = '00:00:00';
       return;
     }
-    const start = entries[entries.length - 1].time;
+    const punchStart = entries[entries.length - 1].time;
+    const start = timerResetAt && timerResetAt > punchStart ? timerResetAt : punchStart;
     const now = new Date();
     totalElapsedEl.textContent = fmtDuration(now - start);
   }
@@ -434,6 +442,8 @@
     const timestamp = new Date();
     entries.push({ time: timestamp, note: noteInput.value.trim() });
     saveEntries();
+    timerResetAt = null;
+    resetTimerBtnState();
     render();
     noteInput.value = '';
     noteInput.placeholder = NOTE_PROMPTS[Math.floor(Math.random() * NOTE_PROMPTS.length)];
@@ -486,17 +496,46 @@
     showToast('Copy failed — text selected below');
   }
 
-  exportBtn.addEventListener('click', () => {
+  const RESET_TIMER_LABEL = resetTimerBtn.textContent;
+  let resetTimerConfirmTimer = null;
+  let resetTimerStage = 0;
+
+  function resetTimerBtnState() {
+    clearTimeout(resetTimerConfirmTimer);
+    resetTimerStage = 0;
+    resetTimerBtn.classList.remove('confirm-pending', 'confirm-pending-final');
+    resetTimerBtn.textContent = RESET_TIMER_LABEL;
+  }
+
+  resetTimerBtn.addEventListener('click', () => {
     if (entries.length === 0) {
-      showToast('Nothing to export yet');
+      showToast('Nothing to reset');
       return;
     }
-    exportText.value = buildLogText();
-    exportBox.classList.toggle('active');
-    if (exportBox.classList.contains('active')) {
-      exportText.focus();
-      exportText.select();
+
+    clearTimeout(resetTimerConfirmTimer);
+
+    if (resetTimerStage === 0) {
+      resetTimerStage = 1;
+      resetTimerBtn.classList.add('confirm-pending');
+      resetTimerBtn.textContent = 'RESET';
+      resetTimerConfirmTimer = setTimeout(resetTimerBtnState, 3000);
+      return;
     }
+
+    if (resetTimerStage === 1) {
+      resetTimerStage = 2;
+      resetTimerBtn.classList.remove('confirm-pending');
+      resetTimerBtn.classList.add('confirm-pending-final');
+      resetTimerBtn.textContent = 'ARE YOU SURE?';
+      resetTimerConfirmTimer = setTimeout(resetTimerBtnState, 3000);
+      return;
+    }
+
+    timerResetAt = new Date();
+    updateTotal();
+    resetTimerBtnState();
+    showToast('Timer reset');
   });
 
   const RESET_LABEL = resetBtn.textContent;
@@ -522,6 +561,8 @@
     resetBtn.classList.remove('confirm-pending');
     resetBtn.textContent = RESET_LABEL;
     entries = [];
+    timerResetAt = null;
+    resetTimerBtnState();
     saveEntries();
     exportBox.classList.remove('active');
     render();
