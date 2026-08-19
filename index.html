@@ -6,7 +6,7 @@
 <title>Field Log</title>
 
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#14181c">
+<meta name="theme-color" content="#14181c" id="themeColorMeta">
 
 <!-- iOS home screen support -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -26,6 +26,7 @@
     --text-dim: #8b95a1;
     --accent: #ff6b1a;
     --accent-dim: #7a3a13;
+    --accent-light: #ffb347;
     --mono: 'SF Mono', 'JetBrains Mono', Consolas, monospace;
     --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
@@ -84,7 +85,7 @@
     width: 100%;
     padding: 26px;
     background: var(--accent);
-    color: #14181c;
+    color: var(--bg);
     border: none;
     border-radius: 14px;
     font-size: 20px;
@@ -212,13 +213,13 @@
   .actions button.confirm-pending {
     background: var(--accent);
     border-color: var(--accent);
-    color: #14181c;
+    color: var(--bg);
   }
 
   .actions button.confirm-pending-final {
-    background: #ffb347;
-    border-color: #ffb347;
-    color: #14181c;
+    background: var(--accent-light);
+    border-color: var(--accent-light);
+    color: var(--bg);
   }
 
   .toast {
@@ -266,6 +267,131 @@
     line-height: 1.5;
     resize: vertical;
   }
+
+  .settings-fab {
+    position: fixed;
+    right: 18px;
+    bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px));
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    z-index: 20;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .settings-fab:active { background: var(--line); color: var(--text); }
+  .settings-fab svg { width: 24px; height: 24px; }
+
+  .settings-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 30;
+  }
+  .settings-overlay.active { opacity: 1; pointer-events: auto; }
+
+  .settings-panel {
+    width: 100%;
+    max-width: 480px;
+    max-height: 80vh;
+    overflow-y: auto;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-bottom: none;
+    border-radius: 18px 18px 0 0;
+    padding: 20px;
+    padding-bottom: max(20px, calc(env(safe-area-inset-bottom) + 12px));
+    transform: translateY(12px);
+    transition: transform 0.2s ease;
+  }
+  .settings-overlay.active .settings-panel { transform: translateY(0); }
+
+  .settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .settings-header h2 {
+    font-size: 15px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+  .settings-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+  }
+  .settings-close:active { color: var(--text); }
+
+  .settings-section h3 {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 10px;
+  }
+
+  .theme-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .theme-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    text-align: left;
+  }
+  .theme-option.active { border-color: var(--accent); }
+
+  .theme-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .theme-option-label {
+    flex: 1;
+    font-size: 14.5px;
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .theme-check {
+    color: var(--accent);
+    font-size: 18px;
+    visibility: hidden;
+  }
+  .theme-option.active .theme-check { visibility: visible; }
 </style>
 </head>
 <body>
@@ -306,8 +432,96 @@
 
 <div class="toast" id="toast"></div>
 
+<button class="settings-fab" id="settingsBtn" aria-label="Settings">
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="currentColor" stroke-width="1.8"/>
+    <path d="M19.4 13.5c.04-.33.06-.66.06-1s-.02-.67-.06-1l2.02-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.38.96a7.5 7.5 0 0 0-1.73-1l-.36-2.53a.5.5 0 0 0-.5-.43h-3.84a.5.5 0 0 0-.5.43l-.36 2.53c-.63.24-1.2.58-1.73 1l-2.38-.96a.5.5 0 0 0-.6.22L2.7 9.28a.5.5 0 0 0 .12.64L4.84 11.5c-.04.33-.06.66-.06 1s.02.67.06 1L2.82 15.08a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.4.31.6.22l2.38-.96c.53.42 1.1.76 1.73 1l.36 2.53a.5.5 0 0 0 .5.43h3.84a.5.5 0 0 0 .5-.43l.36-2.53c.63-.24 1.2-.58 1.73-1l2.38.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64L19.4 13.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+  </svg>
+</button>
+
+<div class="settings-overlay" id="settingsOverlay">
+  <div class="settings-panel">
+    <div class="settings-header">
+      <h2>Settings</h2>
+      <button class="settings-close" id="settingsCloseBtn" aria-label="Close">&times;</button>
+    </div>
+    <div class="settings-section">
+      <h3>Theme</h3>
+      <div class="theme-list" id="themeList"></div>
+    </div>
+  </div>
+</div>
+
 <script>
   const STORAGE_KEY = 'fieldLog.entries.v1';
+  const THEME_STORAGE_KEY = 'fieldLog.theme.v1';
+
+  const THEMES = [
+    {
+      id: 'orange',
+      label: 'Dark Orange',
+      swatch: '#ff6b1a',
+      vars: {
+        '--bg': '#14181c',
+        '--panel': '#1c2127',
+        '--panel-raised': '#232a31',
+        '--line': '#333c44',
+        '--text': '#e8ebee',
+        '--text-dim': '#8b95a1',
+        '--accent': '#ff6b1a',
+        '--accent-dim': '#7a3a13',
+        '--accent-light': '#ffb347'
+      }
+    },
+    {
+      id: 'navy-gold',
+      label: 'Pros4Tech',
+      swatch: '#d4a83c',
+      vars: {
+        '--bg': '#0d1526',
+        '--panel': '#141d33',
+        '--panel-raised': '#1c2740',
+        '--line': '#2c3a5c',
+        '--text': '#e8ebee',
+        '--text-dim': '#8b93ab',
+        '--accent': '#d4a83c',
+        '--accent-dim': '#6b551e',
+        '--accent-light': '#f0c860'
+      }
+    },
+    {
+      id: 'first-order',
+      label: 'First Order',
+      swatch: '#b3182a',
+      vars: {
+        '--bg': '#0a0a0a',
+        '--panel': '#1a1a1a',
+        '--panel-raised': '#242424',
+        '--line': '#3d3d3d',
+        '--text': '#f2f2f2',
+        '--text-dim': '#9a9a9a',
+        '--accent': '#b3182a',
+        '--accent-dim': '#4d0a12',
+        '--accent-light': '#d9505e'
+      }
+    },
+    {
+      id: 'hulk-green',
+      label: 'Hulk Green',
+      swatch: '#1ed760',
+      vars: {
+        '--bg': '#070a08',
+        '--panel': '#0d130e',
+        '--panel-raised': '#141d15',
+        '--line': '#263626',
+        '--text': '#eaf2ec',
+        '--text-dim': '#8aa08f',
+        '--accent': '#1ed760',
+        '--accent-dim': '#0f5c30',
+        '--accent-light': '#6ee89a'
+      }
+    }
+  ];
 
   const NOTE_PROMPTS = [
     "What's happening?",
@@ -334,8 +548,66 @@
   const resetBtn = document.getElementById('resetBtn');
   const toast = document.getElementById('toast');
   const dateDisplay = document.getElementById('dateDisplay');
+  const settingsBtn = document.getElementById('settingsBtn');
+  const settingsOverlay = document.getElementById('settingsOverlay');
+  const settingsCloseBtn = document.getElementById('settingsCloseBtn');
+  const themeList = document.getElementById('themeList');
+  const themeColorMeta = document.getElementById('themeColorMeta');
 
   dateDisplay.textContent = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+
+  // --- theme ---
+
+  function applyTheme(themeId) {
+    const theme = THEMES.find((t) => t.id === themeId) || THEMES[0];
+    Object.entries(theme.vars).forEach(([prop, value]) => {
+      document.documentElement.style.setProperty(prop, value);
+    });
+    themeColorMeta.setAttribute('content', theme.vars['--bg']);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme.id);
+    } catch (err) {
+      // theme just won't persist across reloads this session
+    }
+    renderThemeList(theme.id);
+  }
+
+  function renderThemeList(activeId) {
+    themeList.innerHTML = '';
+    THEMES.forEach((theme) => {
+      const btn = document.createElement('button');
+      btn.className = 'theme-option' + (theme.id === activeId ? ' active' : '');
+      btn.innerHTML = `
+        <span class="theme-swatch" style="background:${theme.swatch}"></span>
+        <span class="theme-option-label">${theme.label}</span>
+        <span class="theme-check">&check;</span>
+      `;
+      btn.addEventListener('click', () => applyTheme(theme.id));
+      themeList.appendChild(btn);
+    });
+  }
+
+  function loadSavedTheme() {
+    try {
+      return localStorage.getItem(THEME_STORAGE_KEY) || THEMES[0].id;
+    } catch (err) {
+      return THEMES[0].id;
+    }
+  }
+
+  function openSettings() {
+    settingsOverlay.classList.add('active');
+  }
+
+  function closeSettings() {
+    settingsOverlay.classList.remove('active');
+  }
+
+  settingsBtn.addEventListener('click', openSettings);
+  settingsCloseBtn.addEventListener('click', closeSettings);
+  settingsOverlay.addEventListener('click', (e) => {
+    if (e.target === settingsOverlay) closeSettings();
+  });
 
   function fmtTime(d) {
     return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
@@ -595,6 +867,7 @@
   );
 
   // --- init ---
+  applyTheme(loadSavedTheme());
   entries = loadEntries();
   noteInput.placeholder = NOTE_PROMPTS[Math.floor(Math.random() * NOTE_PROMPTS.length)];
   render();
