@@ -289,6 +289,29 @@
   .settings-fab:active { background: var(--line); color: var(--text); }
   .settings-fab svg { width: 24px; height: 24px; }
 
+  .undo-fab {
+    position: fixed;
+    left: 18px;
+    bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px));
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    z-index: 20;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .undo-fab:active { background: var(--line); color: var(--text); }
+  .undo-fab svg { width: 28px; height: 28px; }
+  .undo-fab:disabled { opacity: 0.35; cursor: default; }
+  .undo-fab:disabled:active { background: var(--panel-raised); color: var(--text-dim); }
+
   .settings-overlay {
     position: fixed;
     inset: 0;
@@ -432,6 +455,13 @@
 
 <div class="toast" id="toast"></div>
 
+<button class="undo-fab" id="undoBtn" aria-label="Undo" disabled>
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M9.04 5.66A7 7 0 1 1 5.24 10.19" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M2.4 6.9 8.4 4l.4 6.6Z" fill="currentColor"/>
+  </svg>
+</button>
+
 <button class="settings-fab" id="settingsBtn" aria-label="Settings">
   <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="currentColor" stroke-width="1.8"/>
@@ -455,6 +485,8 @@
 <script>
   const STORAGE_KEY = 'fieldLog.entries.v1';
   const THEME_STORAGE_KEY = 'fieldLog.theme.v1';
+  const UNDO_STORAGE_KEY = 'fieldLog.undo.v1';
+  const MAX_UNDO_STEPS = 50;
 
   const THEMES = [
     {
@@ -535,6 +567,7 @@
   let entries = [];
   let totalTimer = null;
   let timerResetAt = null;
+  let undoStack = [];
 
   const punchBtn = document.getElementById('punchBtn');
   const noteInput = document.getElementById('noteInput');
@@ -553,6 +586,7 @@
   const settingsCloseBtn = document.getElementById('settingsCloseBtn');
   const themeList = document.getElementById('themeList');
   const themeColorMeta = document.getElementById('themeColorMeta');
+  const undoBtn = document.getElementById('undoBtn');
 
   dateDisplay.textContent = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
@@ -659,6 +693,56 @@
     }
   }
 
+  // --- undo ---
+  // Snapshots the state before a "normal" action (punch, delete, Reset
+  // Timer, Reset Day) so it can be reverted. Note edits are intentionally
+  // excluded. Capped at MAX_UNDO_STEPS so the history can't grow forever.
+
+  function saveUndoStack() {
+    try {
+      localStorage.setItem(UNDO_STORAGE_KEY, JSON.stringify(undoStack));
+    } catch (err) {
+      // undo history just won't persist across reloads this session
+    }
+  }
+
+  function loadUndoStack() {
+    try {
+      const raw = localStorage.getItem(UNDO_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function updateUndoBtn() {
+    undoBtn.disabled = undoStack.length === 0;
+  }
+
+  function pushUndoSnapshot() {
+    undoStack.push({
+      entries: entries.map((e) => ({ time: e.time.toISOString(), note: e.note })),
+      timerResetAt: timerResetAt ? timerResetAt.toISOString() : null
+    });
+    if (undoStack.length > MAX_UNDO_STEPS) undoStack.shift();
+    saveUndoStack();
+    updateUndoBtn();
+  }
+
+  undoBtn.addEventListener('click', () => {
+    if (undoStack.length === 0) return;
+    const snapshot = undoStack.pop();
+    saveUndoStack();
+    entries = snapshot.entries.map((e) => ({ time: new Date(e.time), note: e.note }));
+    timerResetAt = snapshot.timerResetAt ? new Date(snapshot.timerResetAt) : null;
+    saveEntries();
+    resetTimerConfirm();
+    resetDayConfirm();
+    render();
+    updateTotal();
+    updateUndoBtn();
+  });
+
   // --- rendering ---
 
   function updateTotal() {
@@ -712,6 +796,7 @@
     logEl.querySelectorAll('.del-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const idx = parseInt(e.target.dataset.idx);
+        pushUndoSnapshot();
         entries.splice(idx, 1);
         saveEntries();
         render();
@@ -722,6 +807,7 @@
   }
 
   function logPunch() {
+    pushUndoSnapshot();
     const timestamp = new Date();
     entries.push({ time: timestamp, note: noteInput.value.trim() });
     saveEntries();
@@ -768,22 +854,28 @@
     return text;
   }
 
+  // Resolves true if the clipboard write succeeded, false if the
+  // manual-select fallback had to be shown instead (fallbackShowExport
+  // already surfaces its own toast in that case).
+  function copyLogText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).then(() => true).catch(() => {
+        fallbackShowExport(text);
+        return false;
+      });
+    }
+    fallbackShowExport(text);
+    return Promise.resolve(false);
+  }
+
   copyBtn.addEventListener('click', () => {
     if (entries.length === 0) {
       showToast('Nothing to copy yet');
       return;
     }
-    const text = buildLogText();
-
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(() => {
-        showToast('Copied to clipboard');
-      }).catch(() => {
-        fallbackShowExport(text);
-      });
-    } else {
-      fallbackShowExport(text);
-    }
+    copyLogText(buildLogText()).then((copied) => {
+      if (copied) showToast('Copied to clipboard');
+    });
   });
 
   function fallbackShowExport(text) {
@@ -841,6 +933,7 @@
     () => entries.length > 0,
     'Nothing to reset',
     () => {
+      pushUndoSnapshot();
       timerResetAt = new Date();
       updateTotal();
       showToast('Timer reset');
@@ -856,19 +949,26 @@
     () => entries.length > 0,
     'Nothing to clear',
     () => {
+      pushUndoSnapshot();
+      // Copy the day's log out before it's gone, as insurance against
+      // losing a whole day's data to a reset.
+      copyLogText(buildLogText()).then((copied) => {
+        if (copied) showToast('Copied, then cleared');
+      });
       entries = [];
       timerResetAt = null;
       resetTimerConfirm();
       saveEntries();
       exportBox.classList.remove('active');
       render();
-      showToast('Log cleared');
     }
   );
 
   // --- init ---
   applyTheme(loadSavedTheme());
   entries = loadEntries();
+  undoStack = loadUndoStack();
+  updateUndoBtn();
   noteInput.placeholder = NOTE_PROMPTS[Math.floor(Math.random() * NOTE_PROMPTS.length)];
   render();
   totalTimer = setInterval(updateTotal, 1000);
