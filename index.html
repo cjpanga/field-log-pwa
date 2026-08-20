@@ -101,11 +101,28 @@
     user-select: none;
     touch-action: manipulation;
   }
-  .punch-btn.pressed {
-    transform: scale(0.97);
-    background: transparent;
-    color: var(--text);
-    outline-color: var(--accent);
+  @keyframes punchPress {
+    0% {
+      transform: scale(1);
+      background: var(--accent);
+      color: var(--bg);
+      outline-color: transparent;
+    }
+    50% {
+      transform: scale(0.985);
+      background: var(--accent-dim);
+      color: var(--bg);
+      outline-color: var(--accent-dim);
+    }
+    100% {
+      transform: scale(0.97);
+      background: transparent;
+      color: var(--text);
+      outline-color: var(--accent);
+    }
+  }
+  .punch-btn.pressing {
+    animation: punchPress 0.18s ease forwards;
   }
 
   .note-row {
@@ -827,8 +844,28 @@
   // disambiguate a tap from the start of a long-press/selection gesture),
   // which made the button feel unresponsive and let the long-press trigger
   // the native text-selection callout instead.
-  const press = () => punchBtn.classList.add('pressed');
-  const unpress = () => punchBtn.classList.remove('pressed');
+  // Drives the punch-press animation as a single continuous timeline:
+  // press plays it forward (static -> mid -> full), release reverses it
+  // from wherever it currently sits, so a quick tap reverses from a
+  // partial press and a held-then-released tap plays the full reverse.
+  function press() {
+    punchBtn.classList.add('pressing');
+    const anim = punchBtn.getAnimations().find((a) => a.animationName === 'punchPress');
+    if (anim) {
+      anim.playbackRate = 1;
+      anim.play();
+    }
+  }
+
+  function unpress() {
+    const anim = punchBtn.getAnimations().find((a) => a.animationName === 'punchPress');
+    if (anim) {
+      anim.reverse();
+      anim.onfinish = () => punchBtn.classList.remove('pressing');
+    } else {
+      punchBtn.classList.remove('pressing');
+    }
+  }
 
   punchBtn.addEventListener('touchstart', press, { passive: true });
   punchBtn.addEventListener('touchend', unpress);
