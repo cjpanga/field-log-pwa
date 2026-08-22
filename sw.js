@@ -1,6 +1,6 @@
 // Bump this whenever index.html/manifest/icons change, so installed
 // iOS home-screen apps pick up the update instead of serving stale cache.
-const CACHE_VERSION = 'field-log-v15';
+const CACHE_VERSION = 'field-log-v16';
 
 const ASSETS = [
   './',

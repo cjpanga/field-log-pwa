@@ -474,8 +474,8 @@
 
 <button class="undo-fab" id="undoBtn" aria-label="Undo" disabled>
   <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M9.04 5.66A7 7 0 1 1 5.24 10.19" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
-    <path d="M2.4 6.9 8.4 4l.4 6.6Z" fill="currentColor"/>
+    <path d="M12 20A7.5 7.5 0 1 0 5.5 8.75" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/>
+    <path d="M5 1.4 -1 12.4 12.6 11.3Z" fill="currentColor"/>
   </svg>
 </button>
 
@@ -783,7 +783,14 @@
     emptyState.style.display = 'none';
     logEl.innerHTML = '';
 
-    entries.forEach((entry, idx) => {
+    // Display newest-first so the most recent entry is editable without
+    // scrolling on a long day, while `idx` still refers to the entry's
+    // true chronological position in the underlying array (gap math,
+    // delete, and note-edit handlers all key off that real index).
+    const displayOrder = entries.map((_, i) => i).reverse();
+
+    displayOrder.forEach((idx) => {
+      const entry = entries[idx];
       const div = document.createElement('div');
       div.className = 'entry';
 
