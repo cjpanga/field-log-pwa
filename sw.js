@@ -1,6 +1,6 @@
 // Bump this whenever index.html/manifest/icons change, so installed
 // iOS home-screen apps pick up the update instead of serving stale cache.
-const CACHE_VERSION = 'field-log-v22';
+const CACHE_VERSION = 'field-log-v23';
 
 const ASSETS = [
   './',
@@ -12,9 +12,28 @@ const ASSETS = [
   './icons/icon-512-v2.png'
 ];
 
+// cache: 'reload' forces a true network round-trip, bypassing the browser's
+// own HTTP cache layer -- without this, a "fresh" fetch can still resolve to
+// a stale HTTP-cached response (e.g. during CDN edge propagation right after
+// a deploy), which then gets written into our Cache API storage and never
+// self-heals on subsequent background revalidations.
+function networkFetch(url) {
+  return fetch(url, { cache: 'reload' });
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(ASSETS))
+    caches.open(CACHE_VERSION).then((cache) =>
+      Promise.all(
+        ASSETS.map((url) =>
+          networkFetch(url)
+            .then((response) => {
+              if (response.ok) return cache.put(url, response);
+            })
+            .catch(() => {})
+        )
+      )
+    )
   );
   self.skipWaiting();
 });
@@ -36,7 +55,7 @@ self.addEventListener('fetch', (event) => {
       if (cached) {
         // serve cached copy instantly, refresh cache in the background
         event.waitUntil(
-          fetch(event.request)
+          networkFetch(event.request.url)
             .then((response) => {
               if (response.ok) {
                 return caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, response));
@@ -47,7 +66,7 @@ self.addEventListener('fetch', (event) => {
         return cached;
       }
 
-      return fetch(event.request)
+      return networkFetch(event.request.url)
         .then((response) => {
           if (response.ok) {
             const clone = response.clone();
