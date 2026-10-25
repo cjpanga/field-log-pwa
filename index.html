@@ -79,7 +79,8 @@
   }
 
   .total-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; }
-  .total-value { font-family: var(--mono); font-size: 22px; font-weight: 600; color: var(--accent); }
+  .total-value { font-family: var(--mono); font-size: 22px; font-weight: 600; color: var(--accent); transition: color 0.2s ease; }
+  .total-value.capped { color: var(--text-dim); }
 
   .punch-btn {
     width: 100%;
@@ -496,6 +497,7 @@
   const THEME_STORAGE_KEY = 'fieldLog.theme.v1';
   const UNDO_STORAGE_KEY = 'fieldLog.undo.v1';
   const MAX_UNDO_STEPS = 50;
+  const TIMER_CAP_MS = 8 * 60 * 60 * 1000;
 
   const THEMES = [
     {
@@ -749,12 +751,24 @@
   function updateTotal() {
     if (entries.length === 0) {
       totalElapsedEl.textContent = '00:00:00';
+      totalElapsedEl.classList.remove('capped');
       return;
     }
     const punchStart = entries[entries.length - 1].time;
     const start = timerResetAt && timerResetAt > punchStart ? timerResetAt : punchStart;
     const now = new Date();
-    totalElapsedEl.textContent = fmtDuration(now - start);
+    const elapsed = now - start;
+
+    if (elapsed >= TIMER_CAP_MS) {
+      // Past this, a still-climbing live timer is more likely a sign of a
+      // forgotten punch than a real duration worth watching tick by -- so
+      // freeze it and grey it out rather than let it run indefinitely.
+      totalElapsedEl.textContent = fmtDuration(TIMER_CAP_MS);
+      totalElapsedEl.classList.add('capped');
+    } else {
+      totalElapsedEl.textContent = fmtDuration(elapsed);
+      totalElapsedEl.classList.remove('capped');
+    }
   }
 
   function render() {
