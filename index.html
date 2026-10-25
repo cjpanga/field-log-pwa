@@ -161,7 +161,7 @@
   }
 
   .entry-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-  .entry-time { font-family: var(--mono); font-size: 13px; color: var(--text-dim); }
+  .entry-time { font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--accent); }
   .entry-note {
     font-size: 14.5px;
     color: var(--text);
@@ -172,14 +172,6 @@
   }
   .entry-note:focus { outline: none; }
   .entry-note::placeholder { color: var(--text-dim); font-style: italic; }
-
-  .entry-gap {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--accent);
-    white-space: nowrap;
-    text-align: right;
-  }
 
   .del-btn {
     background: none;
@@ -672,14 +664,6 @@
     return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
   }
 
-  function fmtGap(ms) {
-    const totalMin = Math.round(ms / 60000);
-    if (totalMin < 1) return '<1m';
-    const h = Math.floor(totalMin / 60);
-    const m = totalMin % 60;
-    return h > 0 ? `+${h}h ${m}m` : `+${m}m`;
-  }
-
   function showToast(msg) {
     toast.textContent = msg;
     toast.classList.add('show');
@@ -785,8 +769,8 @@
 
     // Display newest-first so the most recent entry is editable without
     // scrolling on a long day, while `idx` still refers to the entry's
-    // true chronological position in the underlying array (gap math,
-    // delete, and note-edit handlers all key off that real index).
+    // true chronological position in the underlying array (delete and
+    // note-edit handlers key off that real index).
     const displayOrder = entries.map((_, i) => i).reverse();
 
     displayOrder.forEach((idx) => {
@@ -794,14 +778,11 @@
       const div = document.createElement('div');
       div.className = 'entry';
 
-      const gap = idx > 0 ? fmtGap(entry.time - entries[idx - 1].time) : '';
-
       div.innerHTML = `
         <div class="entry-left">
           <span class="entry-time">${fmtTime(entry.time)}</span>
           <input class="entry-note" type="text" placeholder="add note" value="${entry.note.replace(/"/g, '&quot;')}" data-idx="${idx}">
         </div>
-        <span class="entry-gap">${gap}</span>
         <button class="del-btn" data-idx="${idx}">&times;</button>
       `;
       logEl.appendChild(div);
@@ -891,9 +872,11 @@
       const dayTotal = new Date() - entries[0].time;
       text += `Total elapsed: ${fmtDuration(dayTotal)}\n\n`;
     }
-    entries.forEach((entry, idx) => {
-      const gap = idx > 0 ? '  (' + fmtGap(entry.time - entries[idx - 1].time) + ')' : '';
-      text += `${fmtTime(entry.time)}${gap} — ${entry.note || '(no note)'}\n`;
+    // Newest-first, matching the on-screen order.
+    const displayOrder = entries.map((_, i) => i).reverse();
+    displayOrder.forEach((idx) => {
+      const entry = entries[idx];
+      text += `${fmtTime(entry.time)} — ${entry.note || '(no note)'}\n`;
     });
     return text;
   }
