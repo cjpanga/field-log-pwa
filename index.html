@@ -887,10 +887,9 @@
       const dayTotal = new Date() - entries[0].time;
       text += `Total elapsed: ${fmtDuration(dayTotal)}\n\n`;
     }
-    // Newest-first, matching the on-screen order.
-    const displayOrder = entries.map((_, i) => i).reverse();
-    displayOrder.forEach((idx) => {
-      const entry = entries[idx];
+    // Oldest-first (chronological) so the exported text reads like the day
+    // unfolded. The on-screen list stays newest-first.
+    entries.forEach((entry) => {
       text += `${fmtTime(entry.time)} — ${entry.note || '(no note)'}\n`;
     });
     return text;
