@@ -10,7 +10,7 @@
 
 <!-- iOS home screen support -->
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Field Log">
 <link rel="apple-touch-icon" href="icons/icon-180-v2.png">
 <link rel="apple-touch-icon" media="(prefers-color-scheme: dark)" href="icons/icon-180-dark-v2.png">
@@ -38,19 +38,31 @@
     color: var(--text);
     font-family: var(--sans);
     min-height: 100vh;
-    padding: 16px;
-    padding-top: max(28px, calc(env(safe-area-inset-top) + 16px));
+    padding: 0 16px;
     padding-bottom: max(82px, calc(env(safe-area-inset-bottom) + 76px));
     -webkit-tap-highlight-color: transparent;
   }
 
   .wrap { max-width: 480px; margin: 0 auto; }
 
+  /* Sticky + solid so Safari paints this color behind the status bar
+     instead of forcing its translucent blur over scrolling content. */
   header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    margin: 0 -16px;
+    padding: 10px 16px 6px;
+    padding-top: calc(env(safe-area-inset-top) + 10px);
+    background: var(--bg);
+  }
+
+  .header-inner {
+    max-width: 480px;
+    margin: 0 auto;
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    margin-bottom: 4px;
   }
 
   h1 {
@@ -429,12 +441,14 @@
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
+<header>
+  <div class="header-inner">
     <h1>Field Log</h1>
     <div class="date" id="dateDisplay"></div>
-  </header>
+  </div>
+</header>
 
+<div class="wrap">
   <div class="total-bar">
     <span class="total-label">Time since punch</span>
     <span class="total-value" id="totalElapsed">00:00:00</span>
