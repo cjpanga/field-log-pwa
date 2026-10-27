@@ -45,6 +45,28 @@
 
   .wrap { max-width: 480px; margin: 0 auto; }
 
+  /* Invisible layer-promotion hack: an empty element has nothing for
+     background-clip: text to clip to, so this paints zero pixels, but
+     the clip-to-text background still forces WebKit to give it its own
+     compositing layer. That side effect appears to stop iOS from
+     re-applying its forced status-bar blur after a pull-to-refresh
+     rubber-band bounce, which the sticky solid header alone doesn't
+     survive. Not documented behavior -- just an observed workaround. */
+  .remove-blur { display: none; }
+  @media (display-mode: standalone) {
+    .remove-blur {
+      display: block;
+      position: fixed;
+      inset: 0 0 auto;
+      height: 11px;
+      z-index: 2147483647;
+      pointer-events: none;
+      background-color: #fff;
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+  }
+
   /* Sticky + solid so Safari paints this color behind the status bar
      instead of forcing its translucent blur over scrolling content. */
   header {
@@ -441,6 +463,7 @@
 </style>
 </head>
 <body>
+<div class="remove-blur" aria-hidden="true"></div>
 <header>
   <div class="header-inner">
     <h1>Field Log</h1>
