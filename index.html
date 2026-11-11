@@ -170,8 +170,15 @@
     justify-content: center;
     gap: 8px;
   }
-  .chip-row.ends { justify-content: flex-start; }
-  .chip.end { margin-left: auto; }
+  .chip-row.ends { flex-wrap: nowrap; align-items: flex-start; }
+  .chip-mid {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
   /* shown only while the note box is focused (keyboard up) */
   .chips:not(.open) { display: none; }
   .chip {
@@ -697,7 +704,7 @@
         <button type="button" id="verbAddBtn">Add</button>
         <label class="qe-check"><input type="checkbox" id="verbAddInstant"> Punch instantly when tapped</label>
       </div>
-      <div class="qe-hint">Left office and RTO sit at the left and right edges; everything else is centered above them. "Instant" buttons log a punch right away, the rest fill the note box.</div>
+      <div class="qe-hint">The four everyday buttons stay in the top row. New buttons you add show up in the bottom row, between Left office and RTO. "Instant" buttons log a punch right away, the rest fill the note box.</div>
     </div>
   </div>
 </div>
@@ -1274,15 +1281,19 @@
     noteInput.focus();
   }
 
-  // Layout: every button is solid and centered, except the two "bookends"
-  // (Left office / RTO), which are dark outlined and pinned to the left and
-  // right edges on their own row below the others.
+  // Layout: the four everyday buttons are pinned in the top row (solid,
+  // centered). The bottom row has Left office (dark outlined, far left) and
+  // RTO (dark outlined, far right); any button you add in Settings goes in
+  // between them.
+  const PINNED_LABELS = ['arrived', 'left', 'travel', 'lunch'];
   function renderChips() {
     verbChipsEl.innerHTML = '';
     const find = (label) => chips.find((c) => c.label.toLowerCase() === label);
     const startChip = find('left office');
     const endChip = find('rto');
-    const middle = chips.filter((c) => c !== startChip && c !== endChip);
+    const isPinned = (c) => PINNED_LABELS.includes(c.label.toLowerCase());
+    const middle = chips.filter((c) => c !== startChip && c !== endChip && isPinned(c));
+    const extras = chips.filter((c) => c !== startChip && c !== endChip && !isPinned(c));
 
     const makeBtn = (chip, cls) => {
       const b = document.createElement('button');
@@ -1299,11 +1310,15 @@
       middle.forEach((chip) => row.appendChild(makeBtn(chip, 'verb')));
       verbChipsEl.appendChild(row);
     }
-    if (startChip || endChip) {
+    if (startChip || endChip || extras.length) {
       const row = document.createElement('div');
       row.className = 'chip-row ends';
       if (startChip) row.appendChild(makeBtn(startChip, 'instant'));
-      if (endChip) row.appendChild(makeBtn(endChip, 'instant end'));
+      const mid = document.createElement('div');
+      mid.className = 'chip-mid';
+      extras.forEach((chip) => mid.appendChild(makeBtn(chip, 'verb')));
+      row.appendChild(mid);
+      if (endChip) row.appendChild(makeBtn(endChip, 'instant'));
       verbChipsEl.appendChild(row);
     }
   }
