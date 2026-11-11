@@ -1086,11 +1086,11 @@
   //   Left        - punches "Left <name from your most recent Arrived note>" right
   //                 away (falls back to filling "Left " when no visit is open)
   //   RTO         - instant punch
-  // `outlined` buttons get the dark box + border; the rest are solid.
+  // `outlined` buttons (Left office, RTO) get the dark box + border; the rest are solid.
   const CHIPS = [
-    { label: 'Left office', mode: 'instant', outlined: false },
+    { label: 'Left office', mode: 'instant', outlined: true },
     { label: 'Arrived at', mode: 'fill', outlined: false },
-    { label: 'Left', mode: 'left', outlined: true },
+    { label: 'Left', mode: 'left', outlined: false },
     { label: 'RTO', mode: 'instant', outlined: true }
   ];
   // "Arrived at Drexel 1115" or "Arrived Drexel 1115" -> "Drexel" (a trailing
