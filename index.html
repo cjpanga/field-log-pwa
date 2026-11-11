@@ -438,6 +438,81 @@
     visibility: hidden;
   }
   .theme-option.active .theme-check { visibility: visible; }
+
+  /* --- monthly visit checklist (reuses the settings sheet styling) --- */
+  .checklist-open-btn {
+    display: block;
+    width: 100%;
+    margin-top: 8px;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--accent-dim);
+    background: var(--panel);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .checklist-open-btn:active { background: var(--panel-raised); }
+
+  .cl-progress {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+  .cl-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .cl-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+    min-height: 48px;
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    text-align: left;
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.4;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .cl-box {
+    flex: 0 0 22px;
+    width: 22px;
+    height: 22px;
+    margin-top: 1px;
+    border: 2px solid var(--text-dim);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--bg);
+  }
+  .cl-item.done { border-color: var(--accent-dim); }
+  .cl-item.done .cl-box { background: var(--accent); border-color: var(--accent); }
+  .cl-item.done .cl-text { color: var(--text-dim); text-decoration: line-through; }
+  .cl-clear {
+    display: block;
+    width: 100%;
+    margin-top: 14px;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .cl-clear.confirm-pending { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 </style>
 </head>
 <body>
@@ -470,6 +545,8 @@
     <button id="resetTimerBtn">Reset Timer</button>
     <button id="resetBtn">Reset Day</button>
   </div>
+
+  <button class="checklist-open-btn" id="checklistBtn">Monthly Visit Checklist</button>
 
   <div class="export-box" id="exportBox">
     <textarea id="exportText" readonly></textarea>
@@ -504,6 +581,18 @@
       <h3>Theme</h3>
       <div class="theme-list" id="themeList"></div>
     </div>
+  </div>
+</div>
+
+<div class="settings-overlay" id="checklistOverlay">
+  <div class="settings-panel" style="max-height: 85vh;">
+    <div class="settings-header">
+      <h2>Monthly Visit</h2>
+      <button class="settings-close" id="checklistCloseBtn" aria-label="Close">&times;</button>
+    </div>
+    <div class="cl-progress" id="clProgress"></div>
+    <div class="cl-list" id="clList"></div>
+    <button class="cl-clear" id="clClearBtn">Clear all</button>
   </div>
 </div>
 
@@ -668,6 +757,124 @@
   settingsOverlay.addEventListener('click', (e) => {
     if (e.target === settingsOverlay) closeSettings();
   });
+
+  // --- monthly visit checklist ---
+  // Temporary reference list for monthly maintenance visits. To edit it, just
+  // change this array. To remove the feature entirely, delete this block, the
+  // #checklistOverlay markup, the #checklistBtn button, and the .cl-* CSS.
+  // Progress is saved by item text, so reordering/editing items is safe
+  // (an edited item simply shows up unchecked).
+  const CHECKLIST_ITEMS = [
+    'Upon arrival, check in with main contact. Ask if any concerns or issues.',
+    'Check server backups.',
+    'Check server fans.',
+    'Check server filters and clean.',
+    'Check Bitdefender for any issues and make sure it is deployed to all computers.',
+    'Check network equipment fans and clean.',
+    'Check NAS drives for trouble lights and placement.',
+    'Make sure Automate is deployed to all computers and is up to date. Retire any old computers from Automate and Control if needed, making sure computer counts are accurate.',
+    'Check Automate for any failing computer updates. If failing updates are noted, troubleshoot the computer in question to fix the issue.',
+    'Ask users, as you see them, if they have any issues.',
+    'If you run any updates on a user’s computer, communicate with them or leave a note.',
+    'Clean workstations if you notice they are dirty or the customer requests it.',
+    'Make notes of slow computers, upgrades needed, or any other outstanding issues.',
+    'If a user asks you not to work on their computer, let your main contact know and make a note of it.',
+    'Before leaving, check in with contact.'
+  ];
+  const CHECKLIST_STORAGE_KEY = 'fieldLog.checklist.v1';
+
+  const checklistBtn = document.getElementById('checklistBtn');
+  const checklistOverlay = document.getElementById('checklistOverlay');
+  const checklistCloseBtn = document.getElementById('checklistCloseBtn');
+  const clProgress = document.getElementById('clProgress');
+  const clList = document.getElementById('clList');
+  const clClearBtn = document.getElementById('clClearBtn');
+  let clChecked = new Set();
+  let clClearTimer = null;
+
+  function loadChecklist() {
+    try {
+      const raw = localStorage.getItem(CHECKLIST_STORAGE_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      clChecked = new Set(Array.isArray(arr) ? arr : []);
+    } catch (err) {
+      clChecked = new Set();
+    }
+  }
+
+  function saveChecklist() {
+    try {
+      localStorage.setItem(CHECKLIST_STORAGE_KEY, JSON.stringify([...clChecked]));
+    } catch (err) {
+      // progress just won't persist across reloads this session
+    }
+  }
+
+  function renderChecklist() {
+    clList.innerHTML = '';
+    let doneCount = 0;
+    CHECKLIST_ITEMS.forEach((text, i) => {
+      const done = clChecked.has(text);
+      if (done) doneCount++;
+      const btn = document.createElement('button');
+      btn.className = 'cl-item' + (done ? ' done' : '');
+      btn.setAttribute('role', 'checkbox');
+      btn.setAttribute('aria-checked', done ? 'true' : 'false');
+      const box = document.createElement('span');
+      box.className = 'cl-box';
+      box.textContent = done ? '✓' : '';
+      const label = document.createElement('span');
+      label.className = 'cl-text';
+      label.textContent = `${i + 1}. ${text}`;
+      btn.appendChild(box);
+      btn.appendChild(label);
+      btn.addEventListener('click', () => {
+        if (clChecked.has(text)) clChecked.delete(text); else clChecked.add(text);
+        saveChecklist();
+        renderChecklist();
+      });
+      clList.appendChild(btn);
+    });
+    clProgress.textContent = doneCount === CHECKLIST_ITEMS.length
+      ? `All ${CHECKLIST_ITEMS.length} done — nice work`
+      : `${doneCount} of ${CHECKLIST_ITEMS.length} done`;
+  }
+
+  function resetClearBtn() {
+    clearTimeout(clClearTimer);
+    clClearBtn.classList.remove('confirm-pending');
+    clClearBtn.textContent = 'Clear all';
+  }
+
+  clClearBtn.addEventListener('click', () => {
+    if (!clClearBtn.classList.contains('confirm-pending')) {
+      clClearBtn.classList.add('confirm-pending');
+      clClearBtn.textContent = 'Tap again to clear all';
+      clClearTimer = setTimeout(resetClearBtn, 3000);
+      return;
+    }
+    clChecked = new Set();
+    saveChecklist();
+    renderChecklist();
+    resetClearBtn();
+  });
+
+  function openChecklist() {
+    renderChecklist();
+    checklistOverlay.classList.add('active');
+  }
+
+  function closeChecklist() {
+    resetClearBtn();
+    checklistOverlay.classList.remove('active');
+  }
+
+  checklistBtn.addEventListener('click', openChecklist);
+  checklistCloseBtn.addEventListener('click', closeChecklist);
+  checklistOverlay.addEventListener('click', (e) => {
+    if (e.target === checklistOverlay) closeChecklist();
+  });
+  loadChecklist();
 
   function fmtTime(d) {
     return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: true });
