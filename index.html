@@ -168,11 +168,13 @@
   }
   .chips::-webkit-scrollbar { display: none; }
   .chips:empty { display: none; }
+  /* shown only while the note box is focused (keyboard up) */
+  .chips:not(.open) { display: none; }
   .chip {
     flex: 0 0 auto;
     min-height: 42px;
     padding: 0 16px;
-    border-radius: 21px;
+    border-radius: 8px;
     border: 1px solid var(--line);
     background: var(--panel);
     color: var(--text);
@@ -488,7 +490,7 @@
     align-items: center;
     background: var(--panel-raised);
     border: 1px solid var(--line);
-    border-radius: 18px;
+    border-radius: 8px;
     padding: 2px 2px 2px 12px;
     font-size: 14px;
     color: var(--text);
@@ -636,7 +638,6 @@
     <input type="text" id="noteInput" placeholder="What's happening?" autocomplete="off">
   </div>
   <div class="chips" id="verbChips"></div>
-  <div class="chips" id="clientChips"></div>
 
   <div id="logContainer">
     <div class="empty" id="emptyState">No entries yet. Tap "Log Punch" when you leave the office, arrive on site, wrap up — whatever you want timestamped.</div>
@@ -693,15 +694,6 @@
         <label class="qe-check"><input type="checkbox" id="verbAddInstant"> Punch instantly when tapped</label>
       </div>
       <div class="qe-hint">Outlined buttons fill the note box. Solid buttons log a punch right away.</div>
-    </div>
-    <div class="settings-section">
-      <h3>Clients</h3>
-      <div class="qe-list" id="clientEditList"></div>
-      <div class="qe-add">
-        <input type="text" id="clientAddInput" placeholder="Add a client" maxlength="30" autocomplete="off">
-        <button type="button" id="clientAddBtn">Add</button>
-      </div>
-      <div class="qe-hint">Clients are learned automatically from notes that start with "Arrived" or "Left". Tap &times; to remove one (a misspelling, say).</div>
     </div>
   </div>
 </div>
@@ -1169,18 +1161,15 @@
     updateTotal();
   }
 
-  // --- quick buttons: verb chips + learned client chips ---
-  // Verb chips (Arrived / Left / RTO ...) sit under the note box. Modes:
-  //   fill    - drops "Label " into the note box (add a client, then Log Punch)
-  //   left    - punches "Left <client you most recently arrived at>" right away
-  //             (falls back to filling "Left " when no client is known)
+  // --- quick buttons ---
+  // A row of buttons that shows only while the note box is focused (keyboard up).
+  // Modes:
+  //   fill    - drops "Label " into the note box and keeps the keyboard open
+  //   left    - punches "Left <name from your most recent Arrived note>" right
+  //             away (falls back to filling "Left " when no visit is open)
   //   instant - logs a punch with just that label right away
-  // Client chips are learned from notes like "Arrived X" / "Left X 245",
-  // most recently used first. Both lists are editable in Settings.
+  // The buttons are editable in Settings.
   const CHIPS_STORAGE_KEY = 'fieldLog.chips.v1';
-  const CLIENTS_STORAGE_KEY = 'fieldLog.clients.v1';
-  const MAX_CLIENT_CHIPS = 12;
-  const MAX_CLIENTS_STORED = 40;
   const CHIP_MODES = ['fill', 'left', 'instant'];
   const DEFAULT_CHIPS = [
     { label: 'Arrived', mode: 'fill' },
@@ -1190,22 +1179,17 @@
     { label: 'Travel', mode: 'fill' },
     { label: 'Lunch', mode: 'instant' }
   ];
-  const NON_CLIENT_RE = /^(office|home|shop|lunch|break)$/i;
   // "Arrived Drexel 1115" -> "Drexel" (a trailing 3-4 digit time is ignored)
   const CLIENT_NOTE_RE = /^(?:arrived|arrive|left|leave)\s+(.+?)(?:\s+\d{3,4})?\s*$/i;
 
   const verbChipsEl = document.getElementById('verbChips');
-  const clientChipsEl = document.getElementById('clientChips');
   const verbEditList = document.getElementById('verbEditList');
-  const clientEditList = document.getElementById('clientEditList');
   const verbAddInput = document.getElementById('verbAddInput');
   const verbAddInstant = document.getElementById('verbAddInstant');
   const verbAddBtn = document.getElementById('verbAddBtn');
-  const clientAddInput = document.getElementById('clientAddInput');
-  const clientAddBtn = document.getElementById('clientAddBtn');
 
   let chips = DEFAULT_CHIPS.map((c) => ({ ...c }));
-  let clients = [];
+  let chipsHideTimer = null;
 
   function loadChips() {
     try {
@@ -1229,63 +1213,20 @@
     }
   }
 
-  // Returns null when nothing has ever been stored (so we can seed it).
-  function loadClients() {
-    try {
-      const raw = localStorage.getItem(CLIENTS_STORAGE_KEY);
-      if (raw === null) return null;
-      const arr = JSON.parse(raw);
-      return Array.isArray(arr) ? arr.filter((s) => typeof s === 'string' && s.trim()) : [];
-    } catch (err) {
-      return null;
-    }
-  }
-
-  function saveClients() {
-    try {
-      localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(clients));
-    } catch (err) {
-      // client list just won't persist across reloads this session
-    }
-  }
-
   function extractClient(note) {
     const m = CLIENT_NOTE_RE.exec((note || '').trim());
     if (!m) return null;
     const name = m[1].trim();
     if (!name || name.length > 30 || name.split(/\s+/).length > 3) return null;
-    if (NON_CLIENT_RE.test(name)) return null;
     return name;
   }
 
-  // Reuse the spelling already on file so "drexel" and "Drexel" stay one client.
-  function canonicalClient(name) {
-    const lower = name.toLowerCase();
-    return clients.find((c) => c.toLowerCase() === lower) || name;
-  }
-
-  function touchClient(name) {
-    const canonical = canonicalClient(name);
-    clients = clients.filter((c) => c !== canonical);
-    clients.unshift(canonical);
-    if (clients.length > MAX_CLIENTS_STORED) clients.length = MAX_CLIENTS_STORED;
-    saveClients();
-  }
-
-  function learnClient(note) {
-    const name = extractClient(note);
-    if (name) touchClient(name);
-  }
-
-  // The client you most recently arrived at and haven't left yet, if any.
+  // The name from your most recent "Arrived ..." note, if you haven't left yet.
   function currentClient() {
     for (let i = entries.length - 1; i >= 0; i--) {
       const note = entries[i].note || '';
       if (/^(?:left|leave)\b/i.test(note)) return null;
-      if (/^(?:arrived|arrive)\b/i.test(note)) {
-        const name = extractClient(note);
-        return name ? canonicalClient(name) : null;
-      }
+      if (/^(?:arrived|arrive)\b/i.test(note)) return extractClient(note);
     }
     return null;
   }
@@ -1303,37 +1244,30 @@
         break;
       }
     }
-    // trailing space so a typed time ("1115") doesn't run into the name
+    // trailing space so a typed name or time doesn't run into the verb
     noteInput.value = rest ? `${label} ${rest} ` : `${label} `;
   }
 
-  // Add a client to the note box, swapping out a client already chosen there.
-  function applyClient(name) {
-    let cur = noteInput.value.trimEnd();
-    const low = cur.toLowerCase();
-    const prev = clients.find((c) => low === c.toLowerCase() || low.endsWith(' ' + c.toLowerCase()));
-    if (prev) cur = cur.slice(0, cur.length - prev.length).trimEnd();
-    noteInput.value = (cur ? cur + ' ' : '') + name + ' ';
+  // Log a punch from a button, then close the keyboard (which hides the row).
+  function punchFromChip(text) {
+    logPunch(text, { focus: false });
+    noteInput.blur();
+    showToast(`Logged: ${text}`);
   }
 
   function onVerbChip(chip) {
     if (chip.mode === 'instant') {
-      logPunch(chip.label, { focus: false });
-      showToast(`Logged: ${chip.label}`);
+      punchFromChip(chip.label);
       return;
     }
     if (chip.mode === 'left') {
       const client = currentClient();
-      if (client) {
-        const text = `${chip.label} ${client}`;
-        logPunch(text, { focus: false });
-        showToast(`Logged: ${text}`);
-      } else {
-        applyVerb(chip.label);
-      }
+      if (client) punchFromChip(`${chip.label} ${client}`);
+      else { applyVerb(chip.label); noteInput.focus(); }
       return;
     }
     applyVerb(chip.label);
+    noteInput.focus();
   }
 
   function renderChips() {
@@ -1346,55 +1280,52 @@
       b.addEventListener('click', () => onVerbChip(chip));
       verbChipsEl.appendChild(b);
     });
-    clientChipsEl.innerHTML = '';
-    clients.slice(0, MAX_CLIENT_CHIPS).forEach((name) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'chip';
-      b.textContent = name;
-      b.addEventListener('click', () => applyClient(name));
-      clientChipsEl.appendChild(b);
-    });
   }
 
-  function makeEditItem(text, note, onRemove) {
-    const el = document.createElement('span');
-    el.className = 'qe-item';
-    el.appendChild(document.createTextNode(text));
-    if (note) {
-      const small = document.createElement('small');
-      small.textContent = note;
-      el.appendChild(small);
-    }
-    const x = document.createElement('button');
-    x.type = 'button';
-    x.className = 'qe-x';
-    x.setAttribute('aria-label', `Remove ${text}`);
-    x.textContent = '×';
-    x.addEventListener('click', onRemove);
-    el.appendChild(x);
-    return el;
+  // Show the row while the note box has focus; hide it shortly after focus
+  // leaves (the delay lets a tap on a button land before the row disappears).
+  function showChips() {
+    clearTimeout(chipsHideTimer);
+    verbChipsEl.classList.add('open');
   }
+
+  function hideChipsSoon() {
+    clearTimeout(chipsHideTimer);
+    chipsHideTimer = setTimeout(() => {
+      if (document.activeElement !== noteInput) verbChipsEl.classList.remove('open');
+    }, 250);
+  }
+
+  noteInput.addEventListener('focus', showChips);
+  noteInput.addEventListener('blur', hideChipsSoon);
+  // keep focus (and the keyboard) on the note box when a button is pressed
+  verbChipsEl.addEventListener('mousedown', (e) => e.preventDefault());
 
   function renderQuickEditors() {
     verbEditList.innerHTML = '';
     chips.forEach((chip, i) => {
       const note = chip.mode === 'instant' ? 'instant' : chip.mode === 'left' ? 'smart' : '';
-      verbEditList.appendChild(makeEditItem(chip.label, note, () => {
+      const el = document.createElement('span');
+      el.className = 'qe-item';
+      el.appendChild(document.createTextNode(chip.label));
+      if (note) {
+        const small = document.createElement('small');
+        small.textContent = note;
+        el.appendChild(small);
+      }
+      const x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'qe-x';
+      x.setAttribute('aria-label', `Remove ${chip.label}`);
+      x.textContent = '×';
+      x.addEventListener('click', () => {
         chips.splice(i, 1);
         saveChips();
         renderChips();
         renderQuickEditors();
-      }));
-    });
-    clientEditList.innerHTML = '';
-    clients.forEach((name, i) => {
-      clientEditList.appendChild(makeEditItem(name, '', () => {
-        clients.splice(i, 1);
-        saveClients();
-        renderChips();
-        renderQuickEditors();
-      }));
+      });
+      el.appendChild(x);
+      verbEditList.appendChild(el);
     });
   }
 
@@ -1412,31 +1343,11 @@
     renderQuickEditors();
   }
 
-  function addClientManually() {
-    const name = clientAddInput.value.trim();
-    if (!name) return;
-    touchClient(name);
-    clientAddInput.value = '';
-    renderChips();
-    renderQuickEditors();
-  }
-
   verbAddBtn.addEventListener('click', addVerbChip);
   verbAddInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addVerbChip(); });
-  clientAddBtn.addEventListener('click', addClientManually);
-  clientAddInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addClientManually(); });
 
   function initQuickButtons() {
     chips = loadChips();
-    const stored = loadClients();
-    if (stored === null) {
-      // First run with this feature: seed from whatever is already logged today.
-      clients = [];
-      entries.forEach((e) => learnClient(e.note));
-      saveClients();
-    } else {
-      clients = stored;
-    }
     renderChips();
     renderQuickEditors();
   }
@@ -1450,12 +1361,9 @@
     const timestamp = new Date();
     entries.push({ time: timestamp, note });
     saveEntries();
-    learnClient(note);
     timerResetAt = null;
     resetTimerConfirm();
     render();
-    renderChips();
-    renderQuickEditors();
     if (!fromChip) {
       noteInput.value = '';
       noteInput.placeholder = NOTE_PROMPTS[Math.floor(Math.random() * NOTE_PROMPTS.length)];
