@@ -159,15 +159,19 @@
   /* --- quick buttons: verb chips + learned client chips --- */
   .chips {
     display: flex;
+    flex-direction: column;
     gap: 8px;
     margin-top: 10px;
-    overflow-x: auto;
-    padding-bottom: 2px;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
   }
-  .chips::-webkit-scrollbar { display: none; }
   .chips:empty { display: none; }
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+  .chip-row.ends { justify-content: flex-start; }
+  .chip.end { margin-left: auto; }
   /* shown only while the note box is focused (keyboard up) */
   .chips:not(.open) { display: none; }
   .chip {
@@ -185,7 +189,7 @@
     -webkit-tap-highlight-color: transparent;
   }
   .chip:active { background: var(--panel-raised); }
-  /* solid = fills the note box; dark outlined = punches right away */
+  /* solid = everyday buttons; dark outlined = the Left office / RTO bookends */
   .chip.verb {
     background: var(--accent);
     border-color: var(--accent);
@@ -693,7 +697,7 @@
         <button type="button" id="verbAddBtn">Add</button>
         <label class="qe-check"><input type="checkbox" id="verbAddInstant"> Punch instantly when tapped</label>
       </div>
-      <div class="qe-hint">Solid buttons fill the note box. Dark outlined buttons log a punch right away.</div>
+      <div class="qe-hint">Left office and RTO sit at the left and right edges; everything else is centered above them. "Instant" buttons log a punch right away, the rest fill the note box.</div>
     </div>
   </div>
 </div>
@@ -1270,16 +1274,38 @@
     noteInput.focus();
   }
 
+  // Layout: every button is solid and centered, except the two "bookends"
+  // (Left office / RTO), which are dark outlined and pinned to the left and
+  // right edges on their own row below the others.
   function renderChips() {
     verbChipsEl.innerHTML = '';
-    chips.forEach((chip) => {
+    const find = (label) => chips.find((c) => c.label.toLowerCase() === label);
+    const startChip = find('left office');
+    const endChip = find('rto');
+    const middle = chips.filter((c) => c !== startChip && c !== endChip);
+
+    const makeBtn = (chip, cls) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'chip ' + (chip.mode === 'fill' ? 'verb' : 'instant');
+      b.className = 'chip ' + cls;
       b.textContent = chip.label;
       b.addEventListener('click', () => onVerbChip(chip));
-      verbChipsEl.appendChild(b);
-    });
+      return b;
+    };
+
+    if (middle.length) {
+      const row = document.createElement('div');
+      row.className = 'chip-row';
+      middle.forEach((chip) => row.appendChild(makeBtn(chip, 'verb')));
+      verbChipsEl.appendChild(row);
+    }
+    if (startChip || endChip) {
+      const row = document.createElement('div');
+      row.className = 'chip-row ends';
+      if (startChip) row.appendChild(makeBtn(startChip, 'instant'));
+      if (endChip) row.appendChild(makeBtn(endChip, 'instant end'));
+      verbChipsEl.appendChild(row);
+    }
   }
 
   // Show the row while the note box has focus; hide it shortly after focus
