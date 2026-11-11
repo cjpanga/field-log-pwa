@@ -156,54 +156,35 @@
   }
   .note-row input:focus { outline: none; border-color: var(--accent); }
 
-  /* --- quick buttons: verb chips + learned client chips --- */
+  /* --- quick buttons: four fixed buttons, shown only while the note box is focused --- */
   .chips {
     display: flex;
-    flex-direction: column;
     gap: 8px;
     margin-top: 10px;
   }
-  .chips:empty { display: none; }
-  .chip-row {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 8px;
-  }
-  .chip-row.ends { flex-wrap: nowrap; align-items: flex-start; }
-  .chip-mid {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 8px;
-  }
-  /* shown only while the note box is focused (keyboard up) */
   .chips:not(.open) { display: none; }
   .chip {
-    flex: 0 0 auto;
+    flex: 1 1 auto;
     min-height: 42px;
-    padding: 0 16px;
+    padding: 0 10px;
     border-radius: 8px;
-    border: 1px solid var(--line);
-    background: var(--panel);
-    color: var(--text);
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: var(--bg);
     font-size: 14px;
     font-weight: 600;
     white-space: nowrap;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
-  .chip:active { background: var(--panel-raised); }
-  /* solid = everyday buttons; dark outlined = the Left office / RTO bookends */
-  .chip.verb {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: var(--bg);
+  .chip:active { background: var(--accent-light); border-color: var(--accent-light); }
+  /* dark outlined style (Left, RTO) */
+  .chip.outlined {
+    background: var(--panel);
+    border-color: var(--accent-dim);
+    color: var(--accent);
   }
-  .chip.verb:active { background: var(--accent-light); border-color: var(--accent-light); }
-  .chip.instant { border-color: var(--accent-dim); color: var(--accent); }
+  .chip.outlined:active { background: var(--panel-raised); border-color: var(--accent-dim); }
 
   .log {
     margin-top: 14px;
@@ -488,70 +469,6 @@
   }
   .theme-option.active .theme-check { visibility: visible; }
 
-  /* --- settings: quick button + client editors --- */
-  .qe-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 10px;
-  }
-  .qe-list:empty::before { content: 'None yet'; color: var(--text-dim); font-size: 13px; }
-  .qe-item {
-    display: inline-flex;
-    align-items: center;
-    background: var(--panel-raised);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 2px 2px 2px 12px;
-    font-size: 14px;
-    color: var(--text);
-  }
-  .qe-item small { color: var(--text-dim); font-size: 11px; margin-left: 6px; }
-  .qe-x {
-    background: none;
-    border: none;
-    color: var(--text-dim);
-    font-size: 20px;
-    line-height: 1;
-    width: 36px;
-    height: 34px;
-    cursor: pointer;
-  }
-  .qe-x:active { color: var(--text); }
-  .qe-add { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .qe-add input[type="text"] {
-    flex: 1;
-    min-width: 140px;
-    background: var(--panel-raised);
-    border: 1px solid var(--line);
-    color: var(--text);
-    border-radius: 8px;
-    padding: 10px 12px;
-    font-size: 16px;
-    font-family: var(--sans);
-  }
-  .qe-add input[type="text"]:focus { outline: none; border-color: var(--accent); }
-  .qe-add button {
-    padding: 10px 16px;
-    border-radius: 8px;
-    border: 1px solid var(--accent-dim);
-    background: var(--panel);
-    color: var(--accent);
-    font-weight: 600;
-    font-size: 13px;
-    cursor: pointer;
-  }
-  .qe-check {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    color: var(--text-dim);
-  }
-  .qe-hint { font-size: 11px; color: var(--text-dim); margin-top: 8px; line-height: 1.5; }
-  .settings-section + .settings-section { margin-top: 24px; }
-
   /* --- monthly visit checklist (reuses the settings sheet styling) --- */
   .checklist-open-btn {
     display: block;
@@ -695,16 +612,6 @@
     <div class="settings-section">
       <h3>Theme</h3>
       <div class="theme-list" id="themeList"></div>
-    </div>
-    <div class="settings-section">
-      <h3>Quick buttons</h3>
-      <div class="qe-list" id="verbEditList"></div>
-      <div class="qe-add">
-        <input type="text" id="verbAddInput" placeholder="New button (e.g. Lunch)" maxlength="24" autocomplete="off">
-        <button type="button" id="verbAddBtn">Add</button>
-        <label class="qe-check"><input type="checkbox" id="verbAddInstant"> Punch instantly when tapped</label>
-      </div>
-      <div class="qe-hint">The four everyday buttons stay in the top row. New buttons you add show up in the bottom row, between Left office and RTO. "Instant" buttons log a punch right away, the rest fill the note box.</div>
     </div>
   </div>
 </div>
@@ -1173,62 +1080,32 @@
   }
 
   // --- quick buttons ---
-  // A row of buttons that shows only while the note box is focused (keyboard up).
-  // Modes:
-  //   fill    - drops "Label " into the note box and keeps the keyboard open
-  //   left    - punches "Left <name from your most recent Arrived note>" right
-  //             away (falls back to filling "Left " when no visit is open)
-  //   instant - logs a punch with just that label right away
-  // The buttons are editable in Settings.
-  const CHIPS_STORAGE_KEY = 'fieldLog.chips.v1';
-  const CHIP_MODES = ['fill', 'left', 'instant'];
-  const DEFAULT_CHIPS = [
-    { label: 'Arrived', mode: 'fill' },
-    { label: 'Left', mode: 'left' },
-    { label: 'Left office', mode: 'instant' },
-    { label: 'RTO', mode: 'instant' },
-    { label: 'Travel', mode: 'fill' },
-    { label: 'Lunch', mode: 'instant' }
+  // Four fixed buttons that show only while the note box is focused (keyboard up):
+  //   Left office - instant punch
+  //   Arrived at  - fills "Arrived at " into the note box and keeps the keyboard
+  //   Left        - punches "Left <name from your most recent Arrived note>" right
+  //                 away (falls back to filling "Left " when no visit is open)
+  //   RTO         - instant punch
+  // `outlined` buttons get the dark box + border; the rest are solid.
+  const CHIPS = [
+    { label: 'Left office', mode: 'instant', outlined: false },
+    { label: 'Arrived at', mode: 'fill', outlined: false },
+    { label: 'Left', mode: 'left', outlined: true },
+    { label: 'RTO', mode: 'instant', outlined: true }
   ];
-  // "Arrived Drexel 1115" -> "Drexel" (a trailing 3-4 digit time is ignored)
-  const CLIENT_NOTE_RE = /^(?:arrived|arrive|left|leave)\s+(.+?)(?:\s+\d{3,4})?\s*$/i;
+  // "Arrived at Drexel 1115" or "Arrived Drexel 1115" -> "Drexel" (a trailing
+  // 3-4 digit time is ignored)
+  const CLIENT_NOTE_RE = /^(?:arrived|arrive|left|leave)(?:\s+at)?\s+(.+?)(?:\s+\d{3,4})?\s*$/i;
 
   const verbChipsEl = document.getElementById('verbChips');
-  const verbEditList = document.getElementById('verbEditList');
-  const verbAddInput = document.getElementById('verbAddInput');
-  const verbAddInstant = document.getElementById('verbAddInstant');
-  const verbAddBtn = document.getElementById('verbAddBtn');
-
-  let chips = DEFAULT_CHIPS.map((c) => ({ ...c }));
   let chipsHideTimer = null;
-
-  function loadChips() {
-    try {
-      const raw = localStorage.getItem(CHIPS_STORAGE_KEY);
-      if (!raw) return DEFAULT_CHIPS.map((c) => ({ ...c }));
-      const arr = JSON.parse(raw);
-      if (!Array.isArray(arr)) return DEFAULT_CHIPS.map((c) => ({ ...c }));
-      return arr
-        .filter((c) => c && typeof c.label === 'string' && c.label.trim() && CHIP_MODES.includes(c.mode))
-        .map((c) => ({ label: c.label.trim(), mode: c.mode }));
-    } catch (err) {
-      return DEFAULT_CHIPS.map((c) => ({ ...c }));
-    }
-  }
-
-  function saveChips() {
-    try {
-      localStorage.setItem(CHIPS_STORAGE_KEY, JSON.stringify(chips));
-    } catch (err) {
-      // chip edits just won't persist across reloads this session
-    }
-  }
 
   function extractClient(note) {
     const m = CLIENT_NOTE_RE.exec((note || '').trim());
     if (!m) return null;
     const name = m[1].trim();
-    if (!name || name.length > 30 || name.split(/\s+/).length > 3) return null;
+    if (!name || name.toLowerCase() === 'at') return null;
+    if (name.length > 30 || name.split(/\s+/).length > 3) return null;
     return name;
   }
 
@@ -1246,7 +1123,7 @@
   function applyVerb(label) {
     const cur = noteInput.value.trim();
     let rest = cur;
-    const byLength = [...chips].sort((a, b) => b.label.length - a.label.length);
+    const byLength = [...CHIPS].sort((a, b) => b.label.length - a.label.length);
     for (const c of byLength) {
       const v = c.label.toLowerCase();
       const low = cur.toLowerCase();
@@ -1281,46 +1158,16 @@
     noteInput.focus();
   }
 
-  // Layout: the four everyday buttons are pinned in the top row (solid,
-  // centered). The bottom row has Left office (dark outlined, far left) and
-  // RTO (dark outlined, far right); any button you add in Settings goes in
-  // between them.
-  const PINNED_LABELS = ['arrived', 'left', 'travel', 'lunch'];
   function renderChips() {
     verbChipsEl.innerHTML = '';
-    const find = (label) => chips.find((c) => c.label.toLowerCase() === label);
-    const startChip = find('left office');
-    const endChip = find('rto');
-    const isPinned = (c) => PINNED_LABELS.includes(c.label.toLowerCase());
-    const middle = chips.filter((c) => c !== startChip && c !== endChip && isPinned(c));
-    const extras = chips.filter((c) => c !== startChip && c !== endChip && !isPinned(c));
-
-    const makeBtn = (chip, cls) => {
+    CHIPS.forEach((chip) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'chip ' + cls;
+      b.className = 'chip' + (chip.outlined ? ' outlined' : '');
       b.textContent = chip.label;
       b.addEventListener('click', () => onVerbChip(chip));
-      return b;
-    };
-
-    if (middle.length) {
-      const row = document.createElement('div');
-      row.className = 'chip-row';
-      middle.forEach((chip) => row.appendChild(makeBtn(chip, 'verb')));
-      verbChipsEl.appendChild(row);
-    }
-    if (startChip || endChip || extras.length) {
-      const row = document.createElement('div');
-      row.className = 'chip-row ends';
-      if (startChip) row.appendChild(makeBtn(startChip, 'instant'));
-      const mid = document.createElement('div');
-      mid.className = 'chip-mid';
-      extras.forEach((chip) => mid.appendChild(makeBtn(chip, 'verb')));
-      row.appendChild(mid);
-      if (endChip) row.appendChild(makeBtn(endChip, 'instant'));
-      verbChipsEl.appendChild(row);
-    }
+      verbChipsEl.appendChild(b);
+    });
   }
 
   // Show the row while the note box has focus; hide it shortly after focus
@@ -1342,55 +1189,8 @@
   // keep focus (and the keyboard) on the note box when a button is pressed
   verbChipsEl.addEventListener('mousedown', (e) => e.preventDefault());
 
-  function renderQuickEditors() {
-    verbEditList.innerHTML = '';
-    chips.forEach((chip, i) => {
-      const note = chip.mode === 'instant' ? 'instant' : chip.mode === 'left' ? 'smart' : '';
-      const el = document.createElement('span');
-      el.className = 'qe-item';
-      el.appendChild(document.createTextNode(chip.label));
-      if (note) {
-        const small = document.createElement('small');
-        small.textContent = note;
-        el.appendChild(small);
-      }
-      const x = document.createElement('button');
-      x.type = 'button';
-      x.className = 'qe-x';
-      x.setAttribute('aria-label', `Remove ${chip.label}`);
-      x.textContent = '×';
-      x.addEventListener('click', () => {
-        chips.splice(i, 1);
-        saveChips();
-        renderChips();
-        renderQuickEditors();
-      });
-      el.appendChild(x);
-      verbEditList.appendChild(el);
-    });
-  }
-
-  function addVerbChip() {
-    const label = verbAddInput.value.trim();
-    if (!label) return;
-    if (chips.some((c) => c.label.toLowerCase() === label.toLowerCase())) {
-      showToast('You already have that button');
-      return;
-    }
-    chips.push({ label, mode: verbAddInstant.checked ? 'instant' : 'fill' });
-    verbAddInput.value = '';
-    saveChips();
-    renderChips();
-    renderQuickEditors();
-  }
-
-  verbAddBtn.addEventListener('click', addVerbChip);
-  verbAddInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addVerbChip(); });
-
   function initQuickButtons() {
-    chips = loadChips();
     renderChips();
-    renderQuickEditors();
   }
 
   // noteOverride: log this text instead of the note box (used by the chips).
