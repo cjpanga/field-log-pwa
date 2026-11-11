@@ -455,6 +455,7 @@
   }
   .checklist-open-btn:active { background: var(--panel-raised); }
 
+  .settings-header h2.cl-title { color: var(--accent); }
   .cl-progress {
     font-size: 12px;
     color: var(--text-dim);
@@ -546,7 +547,7 @@
     <button id="resetBtn">Reset Day</button>
   </div>
 
-  <button class="checklist-open-btn" id="checklistBtn">Monthly Visit Checklist</button>
+  <button class="checklist-open-btn" id="checklistBtn">Maintenance Visit Checklist</button>
 
   <div class="export-box" id="exportBox">
     <textarea id="exportText" readonly></textarea>
@@ -587,7 +588,7 @@
 <div class="settings-overlay" id="checklistOverlay">
   <div class="settings-panel" style="max-height: 85vh;">
     <div class="settings-header">
-      <h2>Monthly Visit</h2>
+      <h2 class="cl-title">Maintenance Visit</h2>
       <button class="settings-close" id="checklistCloseBtn" aria-label="Close">&times;</button>
     </div>
     <div class="cl-progress" id="clProgress"></div>
